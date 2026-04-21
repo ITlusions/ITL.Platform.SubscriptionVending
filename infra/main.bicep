@@ -15,9 +15,14 @@ param eventGridSasKey string
 @description('Keycloak URL')
 param keycloakUrl string
 
+var webhookPath = '/webhook/'
+var sanitizedPrefix = replace(toLower(namePrefix), '-', '')
+var storageAccountPrefix = length(sanitizedPrefix) >= 1 ? sanitizedPrefix : 'sv'
+var storageAccountName = take('${storageAccountPrefix}sa', 24)
+
 // Storage Account for Function App
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
-  name: '${replace(namePrefix, '-', '')}sa'
+  name: storageAccountName
   location: location
   sku: {
     name: 'Standard_LRS'
@@ -96,7 +101,7 @@ resource eventGridSubscription 'Microsoft.EventGrid/systemTopics/eventSubscripti
     destination: {
       endpointType: 'WebHook'
       properties: {
-        endpointUrl: 'https://${functionApp.properties.defaultHostName}/webhook/'
+        endpointUrl: 'https://${functionApp.properties.defaultHostName}${webhookPath}'
         deliveryAttributeMappings: [
           {
             name: 'aeg-sas-key'
@@ -138,5 +143,5 @@ module roleAssignment './modules/subscriptionOwnerRoleAssignment.bicep' = {
 
 // Outputs
 output functionAppUrl string = 'https://${functionApp.properties.defaultHostName}'
-output webhookEndpoint string = 'https://${functionApp.properties.defaultHostName}/webhook/'
+output webhookEndpoint string = 'https://${functionApp.properties.defaultHostName}${webhookPath}'
 output managedIdentityPrincipalId string = functionApp.identity.principalId
