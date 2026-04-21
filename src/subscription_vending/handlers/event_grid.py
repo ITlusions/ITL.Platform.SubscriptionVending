@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response, status
+from pydantic import ValidationError
 
 from ..config import Settings
 from ..models import EventGridEvent
@@ -68,13 +69,22 @@ async def receive_event(
         return {"validationResponse": validation_code}
 
     for raw_event in events:
-        event = EventGridEvent.model_validate(raw_event)
+        try:
+            event = EventGridEvent.model_validate(raw_event)
+        except ValidationError:
+            logger.warning(
+                "Skipping invalid Event Grid event payload (id=%s, eventType=%s)",
+                raw_event.get("id"),
+                raw_event.get("eventType"),
+            )
+            continue
 
         if not _is_subscription_created(event):
             logger.debug("Event skipped: %s", event.event_type)
             continue
 
         subscription_id = _extract_subscription_id(event)
+        data = event.data
         if not subscription_id:
             logger.warning("Could not extract subscription ID from: %s", event.subject)
             continue
@@ -84,8 +94,8 @@ async def receive_event(
         try:
             await run_provisioning_workflow(
                 subscription_id=subscription_id,
-                subscription_name="",
-                management_group_id="",
+                subscription_name=data.get("displayName", ""),
+                management_group_id=data.get("managementGroupId", ""),
                 settings=_settings,
             )
         except Exception as exc:  # noqa: BLE001
@@ -109,11 +119,14 @@ def _extract_subscription_id(event: EventGridEvent) -> str | None:
     resource_uri = event.data.get("resourceUri", "")
     if resource_uri.startswith("/subscriptions/"):
         parts = resource_uri.split("/")
-        if len(parts) >= 3:
+        if len(parts) > 2 and parts[2]:
             return parts[2]
 
     if "/subscriptions/" in event.subject:
         parts = event.subject.split("/subscriptions/")
-        return parts[1].split("/")[0]
+        if len(parts) > 1:
+            subscription_id = parts[1].split("/")[0]
+            if subscription_id:
+                return subscription_id
 
     return None

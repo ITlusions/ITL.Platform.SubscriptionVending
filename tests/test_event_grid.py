@@ -10,8 +10,7 @@ from subscription_vending.models import EventGridEvent
 
 
 @pytest.fixture()
-def client(monkeypatch):
-    monkeypatch.setenv("VENDING_AZURE_TENANT_ID", "test-tenant-id")
+def client():
     from subscription_vending.main import app  # noqa: PLC0415
     from fastapi.testclient import TestClient  # noqa: PLC0415
 
@@ -102,7 +101,7 @@ def test_batch_of_events_is_processed(client, monkeypatch):
             _subscription_created_event(subscription_id="sub-a"),
             {
                 "id": "evt-skip",
-                "eventType": "Microsoft.Compute.VirtualMachineCreated",
+                "eventType": "Microsoft.Resources.ResourceActionSuccess",
                 "subject": "/subscriptions/sub-skip/resourceGroups/rg",
                 "dataVersion": "1.0",
                 "data": {"operationName": "Microsoft.Compute/virtualMachines/write"},
