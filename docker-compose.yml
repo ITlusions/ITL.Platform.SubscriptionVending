@@ -1,0 +1,16 @@
+services:
+  subscription-vending:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: itl-subscription-vending:local
+    container_name: subscription-vending
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      VENDING_MOCK_MODE: "true"
+    volumes:
+      - ./src:/app/src:ro
+    restart: unless-stopped

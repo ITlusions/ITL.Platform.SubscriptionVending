@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscription-vending
+  labels:
+    app: subscription-vending
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: subscription-vending
+  template:
+    metadata:
+      labels:
+        app: subscription-vending
+    spec:
+      containers:
+        - name: subscription-vending
+          image: myacr.azurecr.io/itl-subscription-vending:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: subscription-vending-config
+          env:
+            - name: VENDING_AZURE_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: subscription-vending-secret
+                  key: azure-tenant-id
+            - name: VENDING_AZURE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: subscription-vending-secret
+                  key: azure-client-id
+                  optional: true
+            - name: VENDING_AZURE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: subscription-vending-secret
+                  key: azure-client-secret
+                  optional: true
+            - name: VENDING_EVENT_GRID_SAS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: subscription-vending-secret
+                  key: event-grid-sas-key
+                  optional: true
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
