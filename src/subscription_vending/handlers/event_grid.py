@@ -1,42 +1,43 @@
-"""Event Grid webhook handler — POST /webhook."""
+"""Event Grid webhook handler — POST /webhook/."""
 
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 
 from ..config import Settings
-from ..models import EventGridEvent, WebhookResponse
+from ..models import EventGridEvent
 from ..workflow import run_provisioning_workflow
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["Event Grid"])
+router = APIRouter(prefix="/webhook", tags=["Event Grid"])
 
 # Singleton settings loaded once at import time.
 _settings = Settings()
 
 
 def _verify_sas_key(aeg_sas_key: str | None, sas_key: str) -> None:
-    """Raise 403 if the provided SAS key does not match the configured one."""
+    """Raise 401 if the provided SAS key does not match the configured one."""
     if sas_key and aeg_sas_key != sas_key:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Event Grid SAS key",
         )
 
 
 @router.post(
-    "/webhook",
-    response_model=WebhookResponse,
+    "/",
+    response_model=None,
     summary="Receive an Event Grid subscription-created event",
 )
 async def receive_event(
     request: Request,
+    aeg_event_type: str | None = Header(default=None, alias="aeg-event-type"),
     aeg_sas_key: str | None = Header(default=None, alias="aeg-sas-key"),
-) -> WebhookResponse:
+) -> Any:
     """
     Handle Event Grid webhook delivery.
 
@@ -46,61 +47,73 @@ async def receive_event(
     """
     _verify_sas_key(aeg_sas_key, _settings.event_grid_sas_key)
 
-    body: list[dict[str, Any]] = await request.json()
-
-    # Event Grid delivers a list; handle the first event.
-    if not body:
+    body = await request.json()
+    events: list[dict[str, Any]] = body if isinstance(body, list) else [body]
+    if not events:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Empty event payload",
         )
 
-    first_event: dict[str, Any] = body[0]
-
     # --- Subscription validation handshake ---------------------------------
-    validation_code: str | None = first_event.get("data", {}).get("validationCode")
-    if validation_code:
+    first_event = events[0]
+    if aeg_event_type == "SubscriptionValidation":
+        validation_code: str | None = first_event.get("data", {}).get("validationCode")
+        if not validation_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Event data missing 'validationCode'",
+            )
         logger.info("Event Grid validation handshake received")
-        return WebhookResponse(
-            status="validationResponse",
-            message=validation_code,
-        )
+        return {"validationResponse": validation_code}
 
-    # --- Parse and process the event ---------------------------------------
-    try:
-        event = EventGridEvent.model_validate(first_event)
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Failed to parse Event Grid event")
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid event schema: {exc}",
-        ) from exc
+    for raw_event in events:
+        event = EventGridEvent.model_validate(raw_event)
 
-    data = event.data
-    subscription_id: str = data.get("subscriptionId", "")
-    if not subscription_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Event data missing 'subscriptionId'",
-        )
+        if not _is_subscription_created(event):
+            logger.debug("Event skipped: %s", event.event_type)
+            continue
 
-    subscription_name: str = data.get("displayName", "")
-    management_group_id: str = data.get("managementGroupId", "")
+        subscription_id = _extract_subscription_id(event)
+        if not subscription_id:
+            logger.warning("Could not extract subscription ID from: %s", event.subject)
+            continue
 
-    logger.info(
-        "Processing subscription-created event for subscription %s", subscription_id
+        logger.info("New subscription received: %s", subscription_id)
+
+        try:
+            await run_provisioning_workflow(
+                subscription_id=subscription_id,
+                subscription_name="",
+                management_group_id="",
+                settings=_settings,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Error provisioning %s: %s", subscription_id, exc)
+            # Do not re-raise — Event Grid would send repeated retries otherwise
+
+    return Response(status_code=status.HTTP_200_OK)
+
+
+def _is_subscription_created(event: EventGridEvent) -> bool:
+    """Check whether the event creates a new subscription."""
+    return (
+        event.event_type == "Microsoft.Resources.ResourceActionSuccess"
+        and "Microsoft.Subscription/aliases/write"
+        in event.data.get("operationName", "")
     )
 
-    results = await run_provisioning_workflow(
-        subscription_id=subscription_id,
-        subscription_name=subscription_name,
-        management_group_id=management_group_id,
-        settings=_settings,
-    )
 
-    any_error = any(v.startswith("error") for v in results.values())
-    return WebhookResponse(
-        status="error" if any_error else "ok",
-        message=str(results),
-        subscription_id=subscription_id,
-    )
+def _extract_subscription_id(event: EventGridEvent) -> str | None:
+    """Extract subscription ID from event subject or resource URI."""
+    resource_uri = event.data.get("resourceUri", "")
+    if resource_uri.startswith("/subscriptions/"):
+        parts = resource_uri.split("/")
+        if len(parts) >= 3:
+            return parts[2]
+
+    if "/subscriptions/" in event.subject:
+        parts = event.subject.split("/subscriptions/")
+        return parts[1].split("/")[0]
+
+    return None
