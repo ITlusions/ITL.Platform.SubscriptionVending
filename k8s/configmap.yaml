@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: subscription-vending-config
+  labels:
+    app: subscription-vending
+data:
+  VENDING_ROOT_MANAGEMENT_GROUP: "ITL"
+  VENDING_AUTHORIZATION_SERVICE_URL: "http://itl-authorization:8004"
+  VENDING_KEYCLOAK_URL: "http://keycloak:8080"
+  VENDING_KEYCLOAK_REALM: "ITL"
+  VENDING_MOCK_MODE: "false"
