@@ -31,15 +31,17 @@ def test_webhook_validation_handshake(client):
             "data": {"validationCode": "my-validation-code"},
         }
     ]
-    response = client.post("/webhook", json=payload)
+    response = client.post(
+        "/webhook/",
+        headers={"aeg-event-type": "SubscriptionValidation"},
+        json=payload,
+    )
     assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "validationResponse"
-    assert body["message"] == "my-validation-code"
+    assert response.json() == {"validationResponse": "my-validation-code"}
 
 
 def test_webhook_empty_payload(client):
-    response = client.post("/webhook", json=[])
+    response = client.post("/webhook/", json=[])
     assert response.status_code == 400
 
 
