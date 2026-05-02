@@ -1,9 +1,7 @@
 using './main.bicep'
 
 param location = 'westeurope'
-param baseName = 'itl-subvending'
-param containerImage = 'myacr.azurecr.io/itl-subscription-vending:latest'
-param azureTenantId = '<your-tenant-id>'
+param namePrefix = 'itl-vending'
 param rootManagementGroup = 'ITL'
-param mockMode = false
+param keycloakUrl = 'https://keycloak.itlusions.com'
 // eventGridSasKey should be supplied via --parameters or Key Vault reference

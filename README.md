@@ -121,7 +121,7 @@ az deployment group create \
   --resource-group rg-itl-subvending \
   --template-file infra/main.bicep \
   --parameters infra/params.bicepparam \
-  --parameters azureTenantId=<tenant-id> containerImage=<acr>/itl-subscription-vending:latest
+  --parameters eventGridSasKey='<secret>' keycloakUrl='https://keycloak.itlusions.com'
 ```
 
 ---
