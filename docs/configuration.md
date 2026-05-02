@@ -107,6 +107,7 @@ The following variables control which Azure AD principals receive default role a
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VENDING_EVENT_GRID_SAS_KEY` | `""` | Shared-access-signature key injected by Event Grid as the `aeg-sas-key` header. When set, the webhook rejects any request whose header does not match. Leave empty to disable SAS key validation. |
+| `VENDING_EVENT_GRID_TOPIC_ENDPOINT` | `""` | Endpoint URL of an Azure Event Grid Custom Topic. When set, the service publishes an outbound `ITL.SubscriptionVending.SubscriptionProvisioned` event after each provisioning run (Step 6). Leave empty to disable outbound notifications. |
 
 ---
 

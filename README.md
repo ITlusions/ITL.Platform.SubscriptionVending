@@ -51,8 +51,9 @@ ITL.Platform.SubscriptionVending/
         │   └── mock.py
         └── azure/
             ├── management_groups.py
-            ├── rbac.py
+            ├── notifications.py
             ├── policy.py
+            ├── rbac.py
             └── tags.py
 ```
 
@@ -138,6 +139,7 @@ See [`.env.example`](.env.example) for a full annotated list, and [docs/configur
 | `VENDING_KEYCLOAK_REALM` | `ITL` | Keycloak realm |
 | `VENDING_MOCK_MODE` | `false` | Enable the `/webhook/test` mock endpoint |
 | `VENDING_EVENT_GRID_SAS_KEY` | `""` | SAS key for validating incoming Event Grid deliveries |
+| `VENDING_EVENT_GRID_TOPIC_ENDPOINT` | `""` | Event Grid Custom Topic endpoint for outbound `SubscriptionProvisioned` notification events. Leave empty to disable outbound notifications. |
 
 #### Environment → Management Group mapping
 
