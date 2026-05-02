@@ -39,28 +39,28 @@ def _get_default_role_assignments(settings: Settings) -> list[RoleAssignmentSpec
     """Return default role assignments based on configuration."""
     assignments: list[RoleAssignmentSpec] = []
 
-    if getattr(settings, "platform_spn_object_id", ""):
+    if settings.platform_spn_object_id:
         assignments.append(RoleAssignmentSpec(
             principal_id=settings.platform_spn_object_id,
             role_definition_name="Owner",
             description="ITL Platform Service Principal",
         ))
 
-    if getattr(settings, "ops_group_object_id", ""):
+    if settings.ops_group_object_id:
         assignments.append(RoleAssignmentSpec(
             principal_id=settings.ops_group_object_id,
             role_definition_name="Contributor",
             description="ITL Operations group",
         ))
 
-    if getattr(settings, "security_group_object_id", ""):
+    if settings.security_group_object_id:
         assignments.append(RoleAssignmentSpec(
             principal_id=settings.security_group_object_id,
             role_definition_name="SecurityReader",
             description="ITL Security group",
         ))
 
-    if getattr(settings, "finops_group_object_id", ""):
+    if settings.finops_group_object_id:
         assignments.append(RoleAssignmentSpec(
             principal_id=settings.finops_group_object_id,
             role_definition_name="CostManagementReader",
@@ -164,9 +164,8 @@ async def create_initial_rbac(
 
     for spec in specs:
         role_def_id = (
-            f"/subscriptions/{subscription_id}"
-            f"/providers/Microsoft.Authorization/roleDefinitions"
-            f"/{ROLE_DEFINITIONS[spec.role_definition_name]}"
+            f"/subscriptions/{subscription_id}/providers/Microsoft.Authorization"
+            f"/roleDefinitions/{ROLE_DEFINITIONS[spec.role_definition_name]}"
         )
         assignment_name = str(uuid.uuid4())
 

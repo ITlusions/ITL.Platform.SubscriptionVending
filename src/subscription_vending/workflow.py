@@ -6,7 +6,7 @@ import logging
 
 from .config import Settings
 from .azure.management_groups import move_subscription_to_management_group
-from .azure.rbac import assign_default_roles, create_initial_rbac
+from .azure.rbac import create_initial_rbac
 from .azure.policy import assign_default_policies
 
 logger = logging.getLogger(__name__)
