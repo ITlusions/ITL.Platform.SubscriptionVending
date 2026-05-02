@@ -6,9 +6,14 @@ import asyncio
 import logging
 import uuid
 
+import httpx
+
 from ..config import Settings
 
 logger = logging.getLogger(__name__)
+
+# Default timeout (seconds) for calls to the Authorization service
+_AUTHORIZATION_SERVICE_TIMEOUT: int = 30
 
 # Default policy definition IDs to assign (e.g. Azure Security Benchmark)
 DEFAULT_POLICY_DEFINITION_IDS: list[str] = []
@@ -24,6 +29,26 @@ def _get_credential(settings: Settings):
             client_secret=settings.azure_client_secret,
         )
     return ManagedIdentityCredential()
+
+
+async def attach_foundation_initiative(
+    authorization_url: str,
+    subscription_id: str,
+) -> str:
+    """
+    Attach the ITL Foundation Initiative to the new subscription.
+
+    Calls the Authorization service sync endpoint and returns the
+    ``initiative_id`` from the response body.
+    """
+    async with httpx.AsyncClient(timeout=_AUTHORIZATION_SERVICE_TIMEOUT) as client:
+        resp = await client.post(
+            f"{authorization_url}/sync/foundation",
+            params={"subscription_id": subscription_id},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("initiative_id", "")
 
 
 async def assign_default_policies(
