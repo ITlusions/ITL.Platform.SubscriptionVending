@@ -14,8 +14,6 @@ from ..config import Settings
 
 logger = logging.getLogger(__name__)
 
-_VALID_ENVIRONMENTS = {"production", "staging", "development", "sandbox"}
-
 
 @dataclass
 class SubscriptionConfig:
@@ -36,14 +34,11 @@ class SubscriptionConfig:
 
 
 def _resolve_management_group(environment: str, settings: Settings) -> str:
-    """Return the MG name for *environment* using the names defined in *settings*."""
-    mapping = {
-        "production":  settings.mg_production,
-        "staging":     settings.mg_staging,
-        "development": settings.mg_development,
-        "sandbox":     settings.mg_sandbox,
-    }
-    return mapping.get(environment, settings.mg_sandbox)
+    """Return the MG name for *environment* using the mapping in *settings*.
+
+    Falls back to the 'sandbox' MG (or default_mg) when environment is not found.
+    """
+    return settings.mg_mapping.get(environment, settings.default_mg)
 
 
 async def read_subscription_config(
@@ -70,7 +65,8 @@ async def read_subscription_config(
 
     if "itl-environment" in tags:
         env = tags["itl-environment"].lower()
-        config.environment = env if env in _VALID_ENVIRONMENTS else "sandbox"
+        # Accept ANY environment value — let the mapping handle resolution
+        config.environment = env
 
     # Resolve MG name from settings so operators can override it via env vars
     config.management_group_name = _resolve_management_group(config.environment, settings)

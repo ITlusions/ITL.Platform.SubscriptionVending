@@ -1,3 +1,6 @@
+import json
+from typing import Dict
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,11 +26,28 @@ class Settings(BaseSettings):
     security_group_object_id: str = ""
     finops_group_object_id:   str = ""
 
-    # Tag-based management group names (one per environment — configurable)
-    mg_production:          str = "ITL-Production"
-    mg_staging:             str = "ITL-Staging"
-    mg_development:         str = "ITL-Development"
-    mg_sandbox:             str = "ITL-Sandbox"
+    # Tag-based management group mapping (JSON string: {"env-name": "MG-Name", ...})
+    # Set VENDING_ENVIRONMENT_MG_MAPPING to a JSON object to define unlimited custom environments.
+    environment_mg_mapping: str = """{
+        "production": "ITL-Production",
+        "staging": "ITL-Staging",
+        "development": "ITL-Development",
+        "sandbox": "ITL-Sandbox"
+    }"""
+
+    @property
+    def mg_mapping(self) -> Dict[str, str]:
+        """Parse the JSON mapping and return as dict."""
+        try:
+            return json.loads(self.environment_mg_mapping)
+        except json.JSONDecodeError:
+            # Fallback to safe default
+            return {"sandbox": "ITL-Sandbox"}
+
+    @property
+    def default_mg(self) -> str:
+        """Fallback MG when environment is not in mapping."""
+        return self.mg_mapping.get("sandbox", "ITL-Sandbox")
 
     # Default recipient for budget alerts when itl-owner tag is absent
     default_alert_email:    str = ""

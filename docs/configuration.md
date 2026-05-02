@@ -24,10 +24,39 @@ When both `VENDING_AZURE_CLIENT_ID` and `VENDING_AZURE_CLIENT_SECRET` are popula
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VENDING_ROOT_MANAGEMENT_GROUP` | `ITL` | Name of the root/default management group. Used as a fallback when no `itl-environment` tag is present. |
-| `VENDING_MG_PRODUCTION` | `ITL-Production` | Management group name for subscriptions tagged `itl-environment=production`. |
-| `VENDING_MG_STAGING` | `ITL-Staging` | Management group name for subscriptions tagged `itl-environment=staging`. |
-| `VENDING_MG_DEVELOPMENT` | `ITL-Development` | Management group name for subscriptions tagged `itl-environment=development`. |
-| `VENDING_MG_SANDBOX` | `ITL-Sandbox` | Management group name for subscriptions tagged `itl-environment=sandbox`. Also the fallback when the tag is missing or invalid. |
+| `VENDING_ENVIRONMENT_MG_MAPPING` | *(JSON — see below)* | JSON string mapping environment names to management group names. Supports unlimited custom environments. |
+
+### Environment → Management Group mapping
+
+`VENDING_ENVIRONMENT_MG_MAPPING` accepts a JSON object where each key is an `itl-environment` tag value and each value is the target management group name.
+
+**Default mapping:**
+
+```bash
+VENDING_ENVIRONMENT_MG_MAPPING='{
+  "production": "ITL-Production",
+  "staging": "ITL-Staging",
+  "development": "ITL-Development",
+  "sandbox": "ITL-Sandbox"
+}'
+```
+
+Any number of additional environments can be added:
+
+```bash
+VENDING_ENVIRONMENT_MG_MAPPING='{
+  "production":  "ITL-Production",
+  "staging":     "ITL-Staging",
+  "development": "ITL-Development",
+  "sandbox":     "ITL-Sandbox",
+  "acceptance":  "ITL-Acceptance",
+  "test":        "ITL-Test",
+  "customer-a":  "CustomerA-Prod",
+  "customer-b":  "CustomerB-Prod"
+}'
+```
+
+If the `itl-environment` tag value is not found in the mapping, the subscription falls back to the `sandbox` management group (or `ITL-Sandbox` if that key is also absent from the mapping). If the JSON value is malformed, the entire mapping falls back to `{"sandbox": "ITL-Sandbox"}`.
 
 ---
 
@@ -93,7 +122,7 @@ Azure subscription tags are read at the start of the provisioning workflow. They
 
 | Tag | Expected values | Effect | Fallback |
 |-----|----------------|--------|---------|
-| `itl-environment` | `production`, `staging`, `development`, `sandbox` | Selects the target management group from the `VENDING_MG_*` variables. Also determines policy enforcement mode (`Default` for production, `DoNotEnforce` for all others). | `sandbox` |
+| `itl-environment` | Any string (e.g. `production`, `staging`, `acceptance`, `customer-a`) | Selects the target management group via `VENDING_ENVIRONMENT_MG_MAPPING`. Also determines policy enforcement mode (`Default` for `production`, `DoNotEnforce` for all others). | `sandbox` MG |
 | `itl-aks` | `true`, `false` | Marks the subscription for AKS/Flux base chart installation. | `false` |
 | `itl-budget` | Integer (e.g. `500`) | Creates a monthly Azure Cost Management budget at the specified EUR amount with e-mail alerts at 80 % and 100 %. | No budget alert |
 | `itl-owner` | E-mail address | Contact address for budget alert notifications. Overrides `VENDING_DEFAULT_ALERT_EMAIL`. | `VENDING_DEFAULT_ALERT_EMAIL` |

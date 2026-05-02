@@ -33,12 +33,17 @@ The subscription is moved under the appropriate management group using the Azure
 
 **Environment → management group mapping:**
 
-| `itl-environment` tag | Default MG name | Override variable |
-|----------------------|----------------|-------------------|
-| `production` | `ITL-Production` | `VENDING_MG_PRODUCTION` |
-| `staging` | `ITL-Staging` | `VENDING_MG_STAGING` |
-| `development` | `ITL-Development` | `VENDING_MG_DEVELOPMENT` |
-| `sandbox` *(or missing/invalid)* | `ITL-Sandbox` | `VENDING_MG_SANDBOX` |
+The target MG is looked up from `VENDING_ENVIRONMENT_MG_MAPPING` (a JSON object). The mapping supports unlimited custom environment names:
+
+| `itl-environment` tag | Default MG name | Configured via |
+|----------------------|----------------|---------------|
+| `production` | `ITL-Production` | `VENDING_ENVIRONMENT_MG_MAPPING` |
+| `staging` | `ITL-Staging` | `VENDING_ENVIRONMENT_MG_MAPPING` |
+| `development` | `ITL-Development` | `VENDING_ENVIRONMENT_MG_MAPPING` |
+| `sandbox` *(or missing/unknown)* | `ITL-Sandbox` | `VENDING_ENVIRONMENT_MG_MAPPING` fallback |
+| Any custom value (e.g. `acceptance`) | *(as configured)* | Add to `VENDING_ENVIRONMENT_MG_MAPPING` |
+
+If the tag value is not in the mapping, the subscription falls back to the `sandbox` MG entry (or `ITL-Sandbox` if that key is absent).
 
 **Required Azure permission:** `Microsoft.Management/managementGroups/subscriptions/write` at the management group scope.
 
