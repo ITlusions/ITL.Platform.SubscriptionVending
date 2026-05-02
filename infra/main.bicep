@@ -19,6 +19,13 @@ var webhookPath = '/webhook/'
 var sanitizedPrefix = replace(toLower(namePrefix), '-', '')
 var storageAccountPrefix = length(sanitizedPrefix) >= 1 ? sanitizedPrefix : 'sv'
 var storageAccountName = take('${storageAccountPrefix}sa', 24)
+var keyVaultName = take('${sanitizedPrefix}-kv', 24)
+
+// Built-in role definition IDs
+var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
+var storageBlobDataOwnerRoleId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
+var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 
 // Storage Account for Function App
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
@@ -28,6 +35,32 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     name: 'Standard_LRS'
   }
   kind: 'StorageV2'
+}
+
+// Key Vault — stores secrets; uses RBAC authorization (no access policies)
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: keyVaultName
+  location: location
+  properties: {
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
+    tenantId: tenant().tenantId
+    enableRbacAuthorization: true
+    enableSoftDelete: true
+    softDeleteRetentionInDays: 90
+    enablePurgeProtection: true
+  }
+}
+
+// Key Vault secret — Event Grid SAS key
+resource eventGridSasKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'event-grid-sas-key'
+  properties: {
+    value: eventGridSasKey
+  }
 }
 
 // App Service Plan (Consumption)
@@ -59,8 +92,9 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
       linuxFxVersion: 'Python|3.12'
       appSettings: [
         {
-          name: 'AzureWebJobsStorage'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+          // Managed-identity storage connection — no account key stored here
+          name: 'AzureWebJobsStorage__accountName'
+          value: storageAccount.name
         }
         {
           name: 'FUNCTIONS_WORKER_RUNTIME'
@@ -75,11 +109,54 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           value: keycloakUrl
         }
         {
+          // Key Vault reference — secret value never stored in App Settings
           name: 'VENDING_EVENT_GRID_SAS_KEY'
-          value: eventGridSasKey
+          value: '@Microsoft.KeyVault(SecretUri=https://${keyVault.name}.vault.azure.net/secrets/${eventGridSasKeySecret.name}/)'
         }
       ]
     }
+  }
+}
+
+// RBAC: Function App MI → Key Vault Secrets User (allows KV reference resolution)
+resource kvSecretsUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVault.id, functionApp.id, keyVaultSecretsUserRoleId)
+  scope: keyVault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// RBAC: Function App MI → Storage (managed-identity AzureWebJobsStorage)
+resource storageBlobOwnerAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, functionApp.id, storageBlobDataOwnerRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataOwnerRoleId)
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource storageQueueContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, functionApp.id, storageQueueDataContributorRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource storageTableContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, functionApp.id, storageTableDataContributorRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageTableDataContributorRoleId)
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
@@ -145,3 +222,4 @@ module roleAssignment './modules/subscriptionOwnerRoleAssignment.bicep' = {
 output functionAppUrl string = 'https://${functionApp.properties.defaultHostName}'
 output webhookEndpoint string = 'https://${functionApp.properties.defaultHostName}${webhookPath}'
 output managedIdentityPrincipalId string = functionApp.identity.principalId
+output keyVaultName string = keyVault.name
