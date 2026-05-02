@@ -122,6 +122,38 @@ The module is deployed at subscription scope (using `scope: subscription()`) as 
 
 ---
 
+## Deploying the Python code to the Function App
+
+After the Bicep infrastructure is in place, deploy the Python application package:
+
+### Using Azure Functions Core Tools
+
+```bash
+func azure functionapp publish itl-vending-func --python
+```
+
+### Using Azure CLI (zip deploy)
+
+```bash
+# Package the repo (from repo root)
+zip -r function.zip . \
+  --exclude ".git/*" \
+  --exclude ".venv/*" \
+  --exclude "tests/*" \
+  --exclude "docs/*" \
+  --exclude "k8s/*" \
+  --exclude "infra/*"
+
+az functionapp deployment source config-zip \
+  --resource-group rg-itl-subvending \
+  --name itl-vending-func \
+  --src function.zip
+```
+
+The Functions host installs `requirements.txt` automatically on first start.
+
+---
+
 ## Updating an existing deployment
 
 Re-run the same `az deployment group create` command — Bicep is idempotent and will only update resources that have changed.

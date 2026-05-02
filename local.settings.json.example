@@ -1,0 +1,12 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "VENDING_AZURE_TENANT_ID": "<your-tenant-id>",
+    "VENDING_ROOT_MANAGEMENT_GROUP": "ITL",
+    "VENDING_KEYCLOAK_URL": "https://keycloak.example.com",
+    "VENDING_EVENT_GRID_SAS_KEY": "<placeholder>",
+    "VENDING_EVENT_GRID_TOPIC_ENDPOINT": "https://<topic-name>.<region>-1.eventgrid.azure.net/api/events"
+  }
+}
