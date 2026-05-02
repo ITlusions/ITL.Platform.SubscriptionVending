@@ -54,7 +54,7 @@ To enable the mock webhook endpoint (useful for testing without a real Azure sub
 VENDING_MOCK_MODE=true
 ```
 
-See [configuration.md](./configuration.md) for a full description of all variables.
+See [configuration.md](./configuration.md) for a full description of all variables, and [secrets.md](./secrets.md) for guidance on which variables are secrets and how to handle them securely.
 
 ---
 
