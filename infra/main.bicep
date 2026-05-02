@@ -26,6 +26,7 @@ var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
 var storageBlobDataOwnerRoleId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
 var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
+var eventGridDataSenderRoleId = 'd5a91429-5739-47e2-a06b-3470a27159e7'
 
 // Storage Account for Function App
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
@@ -60,6 +61,30 @@ resource eventGridSasKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = 
   name: 'event-grid-sas-key'
   properties: {
     value: eventGridSasKey
+  }
+}
+
+// Event Grid Custom Topic — outbound subscription-vended notifications
+resource notificationTopic 'Microsoft.EventGrid/topics@2023-12-15-preview' = {
+  name: '${namePrefix}-notifications'
+  location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    inputSchema: 'EventGridSchema'
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+// RBAC: Function App MI → EventGrid Data Sender on the notification topic
+resource egDataSenderAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(notificationTopic.id, functionApp.id, eventGridDataSenderRoleId)
+  scope: notificationTopic
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', eventGridDataSenderRoleId)
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
@@ -112,6 +137,11 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           // Key Vault reference — secret value never stored in App Settings
           name: 'VENDING_EVENT_GRID_SAS_KEY'
           value: '@Microsoft.KeyVault(SecretUri=https://${keyVault.name}.vault.azure.net/secrets/${eventGridSasKeySecret.name}/)'
+        }
+        {
+          // Outbound notification topic endpoint — resolved via Managed Identity at runtime
+          name: 'VENDING_EVENT_GRID_TOPIC_ENDPOINT'
+          value: notificationTopic.properties.endpoint
         }
       ]
     }
@@ -223,3 +253,4 @@ output functionAppUrl string = 'https://${functionApp.properties.defaultHostName
 output webhookEndpoint string = 'https://${functionApp.properties.defaultHostName}${webhookPath}'
 output managedIdentityPrincipalId string = functionApp.identity.principalId
 output keyVaultName string = keyVault.name
+output notificationTopicEndpoint string = notificationTopic.properties.endpoint
