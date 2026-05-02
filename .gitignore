@@ -19,6 +19,9 @@ env/
 # Environment files (keep .env.example, ignore .env)
 .env
 
+# Azure Functions local settings (keep .example, ignore real file)
+local.settings.json
+
 # IDE
 .idea/
 .vscode/

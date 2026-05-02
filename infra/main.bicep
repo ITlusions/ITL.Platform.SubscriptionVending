@@ -126,6 +126,10 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           value: 'python'
         }
         {
+          name: 'FUNCTIONS_EXTENSION_VERSION'
+          value: '~4'
+        }
+        {
           name: 'VENDING_ROOT_MANAGEMENT_GROUP'
           value: rootManagementGroup
         }

@@ -1,4 +1,7 @@
 # syntax=docker/dockerfile:1
+# NOTE: This Dockerfile is for local development and container/Kubernetes
+# deployments only. It is NOT used for the Azure Function App zip deployment
+# (which uses requirements.txt and the Azure Functions host directly).
 
 # ── Builder stage ─────────────────────────────────────────────────────────────
 FROM python:3.12-slim AS builder
