@@ -106,11 +106,29 @@ See [`.env.example`](.env.example) for a full list.
 | `VENDING_AZURE_CLIENT_ID` | `""` | Service principal client ID (empty = Managed Identity) |
 | `VENDING_AZURE_CLIENT_SECRET` | `""` | Service principal secret |
 | `VENDING_ROOT_MANAGEMENT_GROUP` | `ITL` | Default management group for new subscriptions |
+| `VENDING_MG_PRODUCTION` | `ITL-Production` | Management group for `itl-environment=production` |
+| `VENDING_MG_STAGING` | `ITL-Staging` | Management group for `itl-environment=staging` |
+| `VENDING_MG_DEVELOPMENT` | `ITL-Development` | Management group for `itl-environment=development` |
+| `VENDING_MG_SANDBOX` | `ITL-Sandbox` | Management group for `itl-environment=sandbox` (also the fallback) |
+| `VENDING_DEFAULT_ALERT_EMAIL` | `""` | Fallback e-mail for budget alerts when `itl-owner` tag is absent |
 | `VENDING_AUTHORIZATION_SERVICE_URL` | `http://itl-authorization:8004` | Internal authorization service |
 | `VENDING_KEYCLOAK_URL` | `http://keycloak:8080` | Keycloak base URL |
 | `VENDING_KEYCLOAK_REALM` | `ITL` | Keycloak realm |
 | `VENDING_MOCK_MODE` | `false` | Enable `/webhook/test` mock endpoint |
 | `VENDING_EVENT_GRID_SAS_KEY` | `""` | SAS key for validating Event Grid deliveries |
+
+### Tag-based provisioning
+
+Subscriptions can carry tags that control how they are provisioned:
+
+| Tag | Values | Effect |
+|-----|--------|--------|
+| `itl-environment` | `production`, `staging`, `development`, `sandbox` | Determines management group placement and policy enforcement mode |
+| `itl-aks` | `true` / `false` | Signals that AKS base charts should be installed via Flux |
+| `itl-budget` | Amount in EUR (e.g. `500`) | Creates an Azure Cost Management budget alert |
+| `itl-owner` | E-mail address | Contact for budget alerts; overrides `VENDING_DEFAULT_ALERT_EMAIL` |
+
+Invalid tag values are silently ignored and fall back to defaults so provisioning always continues.
 
 ---
 
