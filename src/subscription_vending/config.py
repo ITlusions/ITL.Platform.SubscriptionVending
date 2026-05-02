@@ -62,4 +62,5 @@ class Settings(BaseSettings):
     mock_mode:              bool = False
 
     # Event Grid
-    event_grid_sas_key:     str = ""
+    event_grid_sas_key:          str = ""
+    event_grid_topic_endpoint:   str = ""   # Outbound notification topic endpoint

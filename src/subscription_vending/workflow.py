@@ -10,6 +10,7 @@ from .azure.management_groups import move_subscription_to_management_group
 from .azure.rbac import create_initial_rbac
 from .azure.policy import assign_default_policies, attach_foundation_initiative
 from .azure.tags import read_subscription_config
+from .azure.notifications import publish_provisioned_event
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +126,13 @@ async def run_provisioning_workflow(
         except Exception as exc:  # noqa: BLE001
             result.errors.append(f"Budget alert failed: {exc}")
             logger.exception("Failed to create budget alert for subscription %s", subscription_id)
+
+    # Step 6 — Publish outbound notification event (non-fatal)
+    await publish_provisioned_event(
+        result=result,
+        subscription_name=subscription_name,
+        settings=settings,
+    )
 
     return result
 

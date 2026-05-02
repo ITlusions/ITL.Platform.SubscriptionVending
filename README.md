@@ -6,6 +6,7 @@ The service listens to Azure Event Grid events and executes a fixed provisioning
 > **Detailed documentation** is available in the [`/docs`](./docs) folder:
 > - [Architecture overview](./docs/architecture.md)
 > - [Configuration reference](./docs/configuration.md)
+> - [Secrets handling](./docs/secrets.md)
 > - [Provisioning workflow](./docs/provisioning-workflow.md)
 > - [API reference](./docs/api.md)
 > - [Local development guide](./docs/development.md)

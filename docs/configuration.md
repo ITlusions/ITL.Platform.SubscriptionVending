@@ -5,6 +5,8 @@ Variables can also be placed in a `.env` file in the project root (loaded automa
 
 Copy [`.env.example`](../.env.example) to `.env` and fill in the values before starting the service.
 
+> For guidance on which variables are secrets and how to handle them securely in each deployment context, see [secrets.md](./secrets.md).
+
 ---
 
 ## Azure credentials
