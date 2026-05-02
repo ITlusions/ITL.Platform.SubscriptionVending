@@ -333,3 +333,56 @@ async def test_read_config_empty_tags_dict():
 
     assert config == SubscriptionConfig(management_group_name="ITL-Sandbox")
 
+
+# ---------------------------------------------------------------------------
+# read_subscription_config — custom tag name overrides
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_read_config_custom_tag_environment_name():
+    """Custom tag_environment name is read instead of the default 'itl-environment'."""
+    settings = _make_settings(tag_environment="myorg-env")
+    sub = _fake_subscription(tags={"myorg-env": "production"})
+    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+        MockClient.return_value.subscriptions.get.return_value = sub
+        config = await read_subscription_config(MagicMock(), "sub-c01", settings)
+
+    assert config.environment == "production"
+    assert config.management_group_name == "ITL-Production"
+
+
+@pytest.mark.asyncio
+async def test_read_config_custom_tag_aks_name():
+    """Custom tag_aks name is read instead of the default 'itl-aks'."""
+    settings = _make_settings(tag_aks="myorg-aks")
+    sub = _fake_subscription(tags={"myorg-aks": "true"})
+    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+        MockClient.return_value.subscriptions.get.return_value = sub
+        config = await read_subscription_config(MagicMock(), "sub-c02", settings)
+
+    assert config.aks_enabled is True
+
+
+@pytest.mark.asyncio
+async def test_read_config_custom_tag_budget_name():
+    """Custom tag_budget name is read instead of the default 'itl-budget'."""
+    settings = _make_settings(tag_budget="cost-budget")
+    sub = _fake_subscription(tags={"cost-budget": "750"})
+    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+        MockClient.return_value.subscriptions.get.return_value = sub
+        config = await read_subscription_config(MagicMock(), "sub-c03", settings)
+
+    assert config.budget_eur == 750
+
+
+@pytest.mark.asyncio
+async def test_read_config_custom_tag_owner_name():
+    """Custom tag_owner name is read instead of the default 'itl-owner'."""
+    settings = _make_settings(tag_owner="cost-owner")
+    sub = _fake_subscription(tags={"cost-owner": "billing@myorg.com"})
+    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+        MockClient.return_value.subscriptions.get.return_value = sub
+        config = await read_subscription_config(MagicMock(), "sub-c04", settings)
+
+    assert config.owner_email == "billing@myorg.com"
+
