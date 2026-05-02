@@ -1,7 +1,16 @@
 # ITL.Platform.SubscriptionVending
 
-Subscription Vending — FastAPI microservice that automatically provisions new Azure subscriptions after creation.  
-The service listens to Event Grid events and executes a fixed provisioning workflow (management group placement, RBAC, policies).
+Subscription Vending is a FastAPI microservice that automatically provisions new Azure subscriptions after creation.  
+The service listens to Azure Event Grid events and executes a fixed provisioning workflow: management group placement, RBAC role assignments, policy assignments, and optional cost budget alerts.
+
+> **Detailed documentation** is available in the [`/docs`](./docs) folder:
+> - [Architecture overview](./docs/architecture.md)
+> - [Configuration reference](./docs/configuration.md)
+> - [Provisioning workflow](./docs/provisioning-workflow.md)
+> - [API reference](./docs/api.md)
+> - [Local development guide](./docs/development.md)
+> - [Infrastructure deployment (Bicep)](./docs/infrastructure.md)
+> - [Kubernetes deployment](./docs/kubernetes.md)
 
 ---
 
@@ -13,9 +22,19 @@ ITL.Platform.SubscriptionVending/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
+├── docs/
+│   ├── architecture.md
+│   ├── api.md
+│   ├── configuration.md
+│   ├── development.md
+│   ├── infrastructure.md
+│   ├── kubernetes.md
+│   └── provisioning-workflow.md
 ├── infra/
 │   ├── main.bicep
-│   └── params.bicepparam
+│   ├── params.bicepparam
+│   └── modules/
+│       └── subscriptionOwnerRoleAssignment.bicep
 ├── k8s/
 │   ├── deployment.yaml
 │   ├── service.yaml
@@ -32,7 +51,8 @@ ITL.Platform.SubscriptionVending/
         └── azure/
             ├── management_groups.py
             ├── rbac.py
-            └── policy.py
+            ├── policy.py
+            └── tags.py
 ```
 
 ---
@@ -42,8 +62,8 @@ ITL.Platform.SubscriptionVending/
 ### Prerequisites
 
 - Python 3.12+
-- Docker (optional, for container-based dev)
-- Azure CLI (for infra deployment)
+- Docker (optional, for container-based development)
+- Azure CLI (for infrastructure deployment)
 
 ### Local development
 
@@ -85,7 +105,7 @@ The service starts on <http://localhost:8000> with `VENDING_MOCK_MODE=true` (moc
 
 ### Mock mode
 
-Set `VENDING_MOCK_MODE=true` to enable the `POST /webhook/test` endpoint:
+Set `VENDING_MOCK_MODE=true` to enable the `POST /webhook/test` endpoint, which lets you trigger the provisioning workflow without a real Event Grid delivery:
 
 ```bash
 curl -X POST http://localhost:8000/webhook/test \
@@ -97,8 +117,8 @@ curl -X POST http://localhost:8000/webhook/test \
 
 ## Configuration
 
-All settings are loaded from environment variables with the `VENDING_` prefix.  
-See [`.env.example`](.env.example) for a full list.
+All settings are loaded from environment variables with the `VENDING_` prefix (or from a `.env` file).  
+See [`.env.example`](.env.example) for a full annotated list, and [docs/configuration.md](./docs/configuration.md) for detailed descriptions.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -107,12 +127,16 @@ See [`.env.example`](.env.example) for a full list.
 | `VENDING_AZURE_CLIENT_SECRET` | `""` | Service principal secret |
 | `VENDING_ROOT_MANAGEMENT_GROUP` | `ITL` | Default management group for new subscriptions |
 | `VENDING_ENVIRONMENT_MG_MAPPING` | *(JSON — see below)* | JSON mapping of environment names to management group names |
+| `VENDING_PLATFORM_SPN_OBJECT_ID` | `""` | Object ID of the platform service principal (granted Owner) |
+| `VENDING_OPS_GROUP_OBJECT_ID` | `""` | Object ID of the Operations group (granted Contributor) |
+| `VENDING_SECURITY_GROUP_OBJECT_ID` | `""` | Object ID of the Security group (granted Security Reader) |
+| `VENDING_FINOPS_GROUP_OBJECT_ID` | `""` | Object ID of the FinOps group (granted Cost Management Reader) |
 | `VENDING_DEFAULT_ALERT_EMAIL` | `""` | Fallback e-mail for budget alerts when `itl-owner` tag is absent |
-| `VENDING_AUTHORIZATION_SERVICE_URL` | `http://itl-authorization:8004` | Internal authorization service |
+| `VENDING_AUTHORIZATION_SERVICE_URL` | `http://itl-authorization:8004` | Internal authorization service base URL |
 | `VENDING_KEYCLOAK_URL` | `http://keycloak:8080` | Keycloak base URL |
 | `VENDING_KEYCLOAK_REALM` | `ITL` | Keycloak realm |
-| `VENDING_MOCK_MODE` | `false` | Enable `/webhook/test` mock endpoint |
-| `VENDING_EVENT_GRID_SAS_KEY` | `""` | SAS key for validating Event Grid deliveries |
+| `VENDING_MOCK_MODE` | `false` | Enable the `/webhook/test` mock endpoint |
+| `VENDING_EVENT_GRID_SAS_KEY` | `""` | SAS key for validating incoming Event Grid deliveries |
 
 #### Environment → Management Group mapping
 
@@ -135,13 +159,13 @@ If the `itl-environment` tag value is not found in the mapping, the subscription
 
 ### Tag-based provisioning
 
-Subscriptions can carry tags that control how they are provisioned:
+Subscriptions can carry Azure resource tags that control how they are provisioned:
 
 | Tag | Values | Effect |
 |-----|--------|--------|
 | `itl-environment` | Any string (e.g. `production`, `staging`, `acceptance`, `customer-a`) | Determines management group placement via `VENDING_ENVIRONMENT_MG_MAPPING`; unknown values fall back to the `sandbox` MG |
 | `itl-aks` | `true` / `false` | Signals that AKS base charts should be installed via Flux |
-| `itl-budget` | Amount in EUR (e.g. `500`) | Creates an Azure Cost Management budget alert |
+| `itl-budget` | Integer amount in EUR (e.g. `500`) | Creates an Azure Cost Management budget with e-mail alerts at 80 % and 100 % |
 | `itl-owner` | E-mail address | Contact for budget alerts; overrides `VENDING_DEFAULT_ALERT_EMAIL` |
 
 Invalid tag values are silently ignored and fall back to defaults so provisioning always continues.
@@ -158,6 +182,8 @@ az deployment group create \
   --parameters eventGridSasKey='<secret>' keycloakUrl='https://keycloak.itlusions.com'
 ```
 
+See [docs/infrastructure.md](./docs/infrastructure.md) for full deployment instructions.
+
 ---
 
 ## Kubernetes deployment
@@ -170,6 +196,8 @@ kubectl create secret generic subscription-vending-secret \
 # Apply manifests
 kubectl apply -f k8s/
 ```
+
+See [docs/kubernetes.md](./docs/kubernetes.md) for full deployment instructions.
 
 ---
 
