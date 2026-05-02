@@ -2,9 +2,11 @@ name: Pipeline
 
 on:
   push:
-    branches: ["main", "develop", "features/**"]
+    branches: ["main", "develop", "feature/**"]
   pull_request:
     branches: ["main", "develop"]
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       bump:
@@ -115,14 +117,15 @@ jobs:
       - name: Bicep build (syntax check)
         run: az bicep build --file infra/main.bicep --outdir /tmp
 
-  # ── Docker build & push (push to main/develop only — skip features/* and PRs) ─
+  # ── Docker build & push (push to main/develop, PRs, and releases — skip feature/* branches) ─
   docker:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
     needs: [version, test, bicep-lint]
     if: |
-      github.event_name == 'push' &&
-      !startsWith(github.ref, 'refs/heads/features/')
+      (github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/feature/')) ||
+      github.event_name == 'pull_request' ||
+      github.event_name == 'release'
     permissions:
       contents: read
       packages: write
@@ -135,6 +138,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -147,16 +151,19 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ needs.version.outputs.version }}
             type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
             type=sha,prefix=sha-,format=short
+          flavor: |
+            latest=false
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -243,9 +250,13 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}},value=${{ steps.bump.outputs.tag }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ steps.bump.outputs.tag }}
+            type=semver,pattern={{version}},value=${{ steps.bump.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.bump.outputs.version }}
+            type=semver,pattern={{major}},value=${{ steps.bump.outputs.version }}
+            type=raw,value=latest
             type=sha,prefix=sha-,format=short
+          flavor: |
+            latest=false
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
