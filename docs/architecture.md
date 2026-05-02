@@ -26,7 +26,8 @@ ITL Subscription Vending  (POST /webhook/)
      ├─ 2. Attach ITL Foundation Initiative (via Authorization service)
      ├─ 3. Create RBAC role assignments
      ├─ 4. Assign default Azure Policies
-     └─ 5. Create cost-budget alert  (if itl-budget tag present)
+     ├─ 5. Create cost-budget alert  (if itl-budget tag present)
+     └─ 6. Publish outbound notification event  (if VENDING_EVENT_GRID_TOPIC_ENDPOINT set)
 ```
 
 ---
@@ -40,10 +41,11 @@ ITL Subscription Vending  (POST /webhook/)
 | `main.py` | Application factory; mounts routers; exposes `/health` |
 | `config.py` | Pydantic-settings `Settings` class; loads `VENDING_*` env vars |
 | `models.py` | Pydantic request/response models for Event Grid and webhooks |
-| `workflow.py` | Orchestrates the five-step provisioning workflow |
+| `workflow.py` | Orchestrates the six-step provisioning workflow |
 | `handlers/event_grid.py` | `POST /webhook/` — receives Event Grid deliveries, validates SAS key, dispatches to workflow |
 | `handlers/mock.py` | `POST /webhook/test` — mock endpoint (enabled when `VENDING_MOCK_MODE=true`) |
 | `azure/management_groups.py` | Moves a subscription under a target management group |
+| `azure/notifications.py` | Publishes an outbound `ITL.SubscriptionVending.SubscriptionProvisioned` event to an Azure Event Grid Custom Topic after each provisioning workflow run (Step 6). Enabled only when `VENDING_EVENT_GRID_TOPIC_ENDPOINT` is set. |
 | `azure/rbac.py` | Creates initial RBAC role assignments on the subscription scope |
 | `azure/policy.py` | Assigns default Azure Policies; attaches the ITL Foundation Initiative via the Authorization service |
 | `azure/tags.py` | Reads subscription tags from Azure and converts them to a `SubscriptionConfig` dataclass |

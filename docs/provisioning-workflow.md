@@ -1,6 +1,6 @@
 # Provisioning Workflow
 
-When the service receives a `Microsoft.Resources.ResourceActionSuccess` event for a `Microsoft.Subscription/aliases/write` operation, it executes the following five-step workflow for the new subscription. Each step is independent — a failure in one step is logged but does not stop subsequent steps.
+When the service receives a `Microsoft.Resources.ResourceActionSuccess` event for a `Microsoft.Subscription/aliases/write` operation, it executes the following workflow for the new subscription (Steps 0–6). Each step is independent — a failure in one step is logged but does not stop subsequent steps.
 
 ---
 
@@ -112,6 +112,30 @@ A monthly Azure Cost Management budget is created (or updated if it already exis
 If no contact e-mail is available, the notifications are created without a contact address.
 
 **Required Azure permission:** `Microsoft.Consumption/budgets/write` at the subscription scope.
+
+---
+
+## Step 6 — Publish outbound notification event *(conditional)*
+
+This step only executes when `VENDING_EVENT_GRID_TOPIC_ENDPOINT` is configured (non-empty).
+
+The service publishes an `ITL.SubscriptionVending.SubscriptionProvisioned` event to the configured Azure Event Grid Custom Topic using `azure/notifications.py`.
+
+**Event payload fields:**
+
+| Field | Description |
+|-------|-------------|
+| `subscription_id` | The provisioned subscription ID |
+| `subscription_name` | Display name of the provisioned subscription |
+| `management_group` | Management group the subscription was moved to |
+| `initiative_id` | Initiative ID returned by the Authorization service |
+| `rbac_roles` | IDs of successfully created role assignments |
+| `errors` | Error messages from failed steps |
+| `success` | `true` when no errors were recorded |
+
+**Non-fatal:** any error encountered while publishing the event is logged as a warning and does **not** affect the `ProvisioningResult`. If `VENDING_EVENT_GRID_TOPIC_ENDPOINT` is not set, this step is silently skipped.
+
+**Relevant configuration:** `VENDING_EVENT_GRID_TOPIC_ENDPOINT` (see [configuration.md](./configuration.md)).
 
 ---
 
