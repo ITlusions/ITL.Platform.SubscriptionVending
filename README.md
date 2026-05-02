@@ -1,3 +1,4 @@
+[![CI](https://github.com/ITlusions/ITL.Platform.SubscriptionVending/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ITlusions/ITL.Platform.SubscriptionVending/actions/workflows/ci.yml)
 # ITL.Platform.SubscriptionVending
 
 Subscription Vending is a FastAPI microservice that automatically provisions new Azure subscriptions after creation.  
