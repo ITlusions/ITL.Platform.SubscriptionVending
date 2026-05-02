@@ -6,7 +6,7 @@ import logging
 
 from .config import Settings
 from .azure.management_groups import move_subscription_to_management_group
-from .azure.rbac import assign_default_roles
+from .azure.rbac import assign_default_roles, create_initial_rbac
 from .azure.policy import assign_default_policies
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ async def run_provisioning_workflow(
 
     # Step 2 — RBAC role assignments
     try:
-        await assign_default_roles(subscription_id=subscription_id, settings=settings)
+        await create_initial_rbac(subscription_id=subscription_id, settings=settings)
         results["rbac"] = "ok"
         logger.info("Default RBAC roles assigned for subscription %s", subscription_id)
     except Exception as exc:  # noqa: BLE001

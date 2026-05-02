@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     keycloak_url:           str = "http://keycloak:8080"
     keycloak_realm:         str = "ITL"
 
+    # RBAC — object IDs for default role assignments on new subscriptions
+    platform_spn_object_id:   str = ""
+    ops_group_object_id:      str = ""
+    security_group_object_id: str = ""
+    finops_group_object_id:   str = ""
+
     # Mode
     mock_mode:              bool = False
 
