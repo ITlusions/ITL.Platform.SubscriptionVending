@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     security_group_object_id: str = ""
     finops_group_object_id:   str = ""
 
+    # Tag-based management group names (one per environment — configurable)
+    mg_production:          str = "ITL-Production"
+    mg_staging:             str = "ITL-Staging"
+    mg_development:         str = "ITL-Development"
+    mg_sandbox:             str = "ITL-Sandbox"
+
+    # Default recipient for budget alerts when itl-owner tag is absent
+    default_alert_email:    str = ""
+
     # Mode
     mock_mode:              bool = False
 

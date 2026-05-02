@@ -8,6 +8,7 @@ from .config import Settings
 from .azure.management_groups import move_subscription_to_management_group
 from .azure.rbac import create_initial_rbac
 from .azure.policy import assign_default_policies
+from .azure.tags import read_subscription_config
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +20,15 @@ async def run_provisioning_workflow(
     settings: Settings,
 ) -> dict[str, str]:
     """
-    Execute the fixed provisioning workflow for a new subscription.
+    Execute the provisioning workflow for a new subscription.
 
     Steps:
-      1. Move the subscription under the target management group.
+      0. Read subscription tags to derive provisioning configuration.
+      1. Move the subscription under the tag-determined management group
+         (falls back to *management_group_id* or ``settings.root_management_group``).
       2. Assign default RBAC roles.
       3. Assign default policies.
+      4. Create a cost budget alert when the ``itl-budget`` tag is present.
 
     Returns a dict summarising the outcome of each step.
     """
@@ -36,9 +40,21 @@ async def run_provisioning_workflow(
         subscription_name,
     )
 
+    # Step 0 — Read subscription tags
+    from .azure.management_groups import _get_credential  # noqa: PLC0415
+
+    credential = _get_credential(settings)
+    config = await read_subscription_config(credential, subscription_id, settings)
+    results["tags"] = (
+        f"env={config.environment}, mg={config.management_group_name}, "
+        f"aks={config.aks_enabled}, budget={config.budget_eur}"
+    )
+
     # Step 1 — Management group placement
+    # Prefer the tag-derived MG; fall back to the caller-supplied value or the
+    # root MG configured in settings.
     try:
-        mg_id = management_group_id or settings.root_management_group
+        mg_id = config.management_group_name or management_group_id or settings.root_management_group
         await move_subscription_to_management_group(
             subscription_id=subscription_id,
             management_group_id=mg_id,
@@ -68,4 +84,79 @@ async def run_provisioning_workflow(
         results["policy"] = f"error: {exc}"
         logger.exception("Failed to assign default policies")
 
+    # Step 4 — Cost budget alert (only when itl-budget tag is set)
+    if config.budget_eur > 0:
+        try:
+            contact_email = config.owner_email or settings.default_alert_email
+            await _create_budget_alert(
+                credential=credential,
+                subscription_id=subscription_id,
+                amount=config.budget_eur,
+                contact_email=contact_email,
+            )
+            results["budget"] = f"ok (amount={config.budget_eur} EUR)"
+            logger.info(
+                "Budget alert created for subscription %s (amount=%d EUR, contact=%s)",
+                subscription_id,
+                config.budget_eur,
+                contact_email,
+            )
+        except Exception as exc:  # noqa: BLE001
+            results["budget"] = f"error: {exc}"
+            logger.exception("Failed to create budget alert for subscription %s", subscription_id)
+
     return results
+
+
+async def _create_budget_alert(
+    credential,
+    subscription_id: str,
+    amount: int,
+    contact_email: str,
+) -> None:
+    """Create an Azure Cost Management budget with an e-mail alert.
+
+    The budget is scoped to *subscription_id*, capped at *amount* EUR per
+    calendar month, and sends an alert to *contact_email* at 80 % and 100 %
+    of the threshold.
+    """
+    import asyncio  # noqa: PLC0415
+
+    def _create() -> None:
+        from azure.mgmt.consumption import ConsumptionManagementClient  # noqa: PLC0415
+        from azure.mgmt.consumption.models import (  # noqa: PLC0415
+            Budget,
+            BudgetTimePeriod,
+            Notification,
+        )
+        from datetime import date, timedelta  # noqa: PLC0415
+
+        client = ConsumptionManagementClient(
+            credential=credential,
+            subscription_id=subscription_id,
+        )
+        scope = f"/subscriptions/{subscription_id}"
+        budget_name = "itl-budget-alert"
+        today = date.today()
+        start = today.replace(day=1)
+        end = start.replace(year=start.year + 3)
+
+        notifications: dict = {}
+        for threshold in (80, 100):
+            key = f"Actual_{threshold}Percent"
+            notifications[key] = Notification(
+                enabled=True,
+                operator="GreaterThan",
+                threshold=threshold,
+                contact_emails=[contact_email] if contact_email else [],
+            )
+
+        budget = Budget(
+            time_grain="Monthly",
+            amount=amount,
+            time_period=BudgetTimePeriod(start_date=start, end_date=end),
+            notifications=notifications,
+        )
+        client.budgets.create_or_update(scope=scope, budget_name=budget_name, parameters=budget)
+
+    await asyncio.to_thread(_create)
