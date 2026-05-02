@@ -3,14 +3,28 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 
 from .config import Settings
 from .azure.management_groups import move_subscription_to_management_group
 from .azure.rbac import create_initial_rbac
-from .azure.policy import assign_default_policies
+from .azure.policy import assign_default_policies, attach_foundation_initiative
 from .azure.tags import read_subscription_config
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ProvisioningResult:
+    subscription_id:  str
+    management_group: str = ""
+    initiative_id:    str = ""
+    rbac_roles:       list[str] = field(default_factory=list)
+    errors:           list[str] = field(default_factory=list)
+
+    @property
+    def success(self) -> bool:
+        return len(self.errors) == 0
 
 
 async def run_provisioning_workflow(
@@ -18,7 +32,7 @@ async def run_provisioning_workflow(
     subscription_name: str,
     management_group_id: str,
     settings: Settings,
-) -> dict[str, str]:
+) -> ProvisioningResult:
     """
     Execute the provisioning workflow for a new subscription.
 
@@ -26,13 +40,14 @@ async def run_provisioning_workflow(
       0. Read subscription tags to derive provisioning configuration.
       1. Move the subscription under the tag-determined management group
          (falls back to *management_group_id* or ``settings.root_management_group``).
-      2. Assign default RBAC roles.
-      3. Assign default policies.
-      4. Create a cost budget alert when the ``itl-budget`` tag is present.
+      2. Attach the ITL Foundation Initiative to the subscription.
+      3. Assign default RBAC roles.
+      4. Assign default policies.
+      5. Create a cost budget alert when the ``itl-budget`` tag is present.
 
-    Returns a dict summarising the outcome of each step.
+    Returns a :class:`ProvisioningResult` summarising the outcome of each step.
     """
-    results: dict[str, str] = {}
+    result = ProvisioningResult(subscription_id=subscription_id)
 
     logger.info(
         "Starting provisioning workflow for subscription %s (%s)",
@@ -45,10 +60,6 @@ async def run_provisioning_workflow(
 
     credential = _get_credential(settings)
     config = await read_subscription_config(credential, subscription_id, settings)
-    results["tags"] = (
-        f"env={config.environment}, mg={config.management_group_name}, "
-        f"aks={config.aks_enabled}, budget={config.budget_eur}"
-    )
 
     # Step 1 — Management group placement
     # Prefer the tag-derived MG; fall back to the caller-supplied value or the
@@ -60,31 +71,42 @@ async def run_provisioning_workflow(
             management_group_id=mg_id,
             settings=settings,
         )
-        results["management_group"] = "ok"
+        result.management_group = mg_id
         logger.info("Subscription %s moved to management group %s", subscription_id, mg_id)
     except Exception as exc:  # noqa: BLE001
-        results["management_group"] = f"error: {exc}"
+        result.errors.append(f"MG assignment failed: {exc}")
         logger.exception("Failed to move subscription to management group")
 
-    # Step 2 — RBAC role assignments
+    # Step 2 — Attach foundation initiative
     try:
-        await create_initial_rbac(subscription_id=subscription_id, settings=settings)
-        results["rbac"] = "ok"
+        initiative_id = await attach_foundation_initiative(
+            authorization_url=settings.authorization_service_url,
+            subscription_id=subscription_id,
+        )
+        result.initiative_id = initiative_id
+        logger.info("Foundation initiative attached for subscription %s: %s", subscription_id, initiative_id)
+    except Exception as exc:  # noqa: BLE001
+        result.errors.append(f"Foundation initiative failed: {exc}")
+        logger.exception("Failed to attach foundation initiative")
+
+    # Step 3 — RBAC role assignments
+    try:
+        roles = await create_initial_rbac(subscription_id=subscription_id, settings=settings)
+        result.rbac_roles = roles
         logger.info("Default RBAC roles assigned for subscription %s", subscription_id)
     except Exception as exc:  # noqa: BLE001
-        results["rbac"] = f"error: {exc}"
+        result.errors.append(f"RBAC creation failed: {exc}")
         logger.exception("Failed to assign default RBAC roles")
 
-    # Step 3 — Policy assignments
+    # Step 4 — Policy assignments
     try:
         await assign_default_policies(subscription_id=subscription_id, settings=settings)
-        results["policy"] = "ok"
         logger.info("Default policies assigned for subscription %s", subscription_id)
     except Exception as exc:  # noqa: BLE001
-        results["policy"] = f"error: {exc}"
+        result.errors.append(f"Policy assignment failed: {exc}")
         logger.exception("Failed to assign default policies")
 
-    # Step 4 — Cost budget alert (only when itl-budget tag is set)
+    # Step 5 — Cost budget alert (only when itl-budget tag is set)
     if config.budget_eur > 0:
         try:
             contact_email = config.owner_email or settings.default_alert_email
@@ -94,7 +116,6 @@ async def run_provisioning_workflow(
                 amount=config.budget_eur,
                 contact_email=contact_email,
             )
-            results["budget"] = f"ok (amount={config.budget_eur} EUR)"
             logger.info(
                 "Budget alert created for subscription %s (amount=%d EUR, contact=%s)",
                 subscription_id,
@@ -102,10 +123,10 @@ async def run_provisioning_workflow(
                 contact_email,
             )
         except Exception as exc:  # noqa: BLE001
-            results["budget"] = f"error: {exc}"
+            result.errors.append(f"Budget alert failed: {exc}")
             logger.exception("Failed to create budget alert for subscription %s", subscription_id)
 
-    return results
+    return result
 
 
 async def _create_budget_alert(
