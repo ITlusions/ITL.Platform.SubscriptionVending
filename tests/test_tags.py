@@ -146,7 +146,7 @@ def test_default_mg_property():
     assert settings.default_mg == "ITL-Sandbox"
 
 
-def test_default_mg_property_custom_sandbox():
+def test_default_mg_property_fallback_when_sandbox_missing():
     """default_mg falls back to ITL-Sandbox when sandbox key is absent."""
     settings = _make_settings(environment_mg_mapping=json.dumps({"production": "Prod-MG"}))
     assert settings.default_mg == "ITL-Sandbox"
