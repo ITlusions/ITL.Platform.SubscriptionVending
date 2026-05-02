@@ -170,6 +170,15 @@ Subscriptions can carry Azure resource tags that control how they are provisione
 
 Invalid tag values are silently ignored and fall back to defaults so provisioning always continues.
 
+The tag key names above are defaults and can be overridden to match your own tagging conventions:
+
+| Environment variable | Default | Description |
+|---|---|---|
+| `VENDING_TAG_ENVIRONMENT` | `itl-environment` | Tag key for the target environment / management group |
+| `VENDING_TAG_AKS` | `itl-aks` | Tag key to enable AKS/Flux setup |
+| `VENDING_TAG_BUDGET` | `itl-budget` | Tag key for the monthly budget amount in EUR |
+| `VENDING_TAG_OWNER` | `itl-owner` | Tag key for the budget alert e-mail address |
+
 ---
 
 ## Infrastructure deployment (Bicep)

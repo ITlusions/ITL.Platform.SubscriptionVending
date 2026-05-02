@@ -63,29 +63,30 @@ async def read_subscription_config(
 
     config = SubscriptionConfig()
 
-    if "itl-environment" in tags:
-        env = tags["itl-environment"].lower()
+    if settings.tag_environment in tags:
+        env = tags[settings.tag_environment].lower()
         # Accept ANY environment value — let the mapping handle resolution
         config.environment = env
 
     # Resolve MG name from settings so operators can override it via env vars
     config.management_group_name = _resolve_management_group(config.environment, settings)
 
-    if "itl-aks" in tags:
-        config.aks_enabled = tags["itl-aks"].lower() == "true"
+    if settings.tag_aks in tags:
+        config.aks_enabled = tags[settings.tag_aks].lower() == "true"
 
-    if "itl-budget" in tags:
+    if settings.tag_budget in tags:
         try:
-            config.budget_eur = int(tags["itl-budget"])
+            config.budget_eur = int(tags[settings.tag_budget])
         except ValueError:
             logger.warning(
-                "[%s] Invalid itl-budget tag value: %r",
+                "[%s] Invalid %s tag value: %r",
                 subscription_id,
-                tags["itl-budget"],
+                settings.tag_budget,
+                tags[settings.tag_budget],
             )
 
-    if "itl-owner" in tags:
-        config.owner_email = tags["itl-owner"]
+    if settings.tag_owner in tags:
+        config.owner_email = tags[settings.tag_owner]
 
     logger.info(
         "[%s] Subscription config loaded: env=%s, mg=%s, aks=%s, budget=%d",

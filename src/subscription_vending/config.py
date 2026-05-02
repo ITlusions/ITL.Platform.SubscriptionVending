@@ -49,6 +49,12 @@ class Settings(BaseSettings):
         """Fallback MG when environment is not in mapping."""
         return self.mg_mapping.get("sandbox", "ITL-Sandbox")
 
+    # Configurable tag key names (override to match your own tagging convention)
+    tag_environment:        str = "itl-environment"
+    tag_aks:                str = "itl-aks"
+    tag_budget:             str = "itl-budget"
+    tag_owner:              str = "itl-owner"
+
     # Default recipient for budget alerts when itl-owner tag is absent
     default_alert_email:    str = ""
 

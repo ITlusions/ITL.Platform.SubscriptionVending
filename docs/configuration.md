@@ -128,3 +128,23 @@ Azure subscription tags are read at the start of the provisioning workflow. They
 | `itl-owner` | E-mail address | Contact address for budget alert notifications. Overrides `VENDING_DEFAULT_ALERT_EMAIL`. | `VENDING_DEFAULT_ALERT_EMAIL` |
 
 Invalid tag values are silently ignored and the corresponding default is used, so provisioning always continues even when tags are malformed.
+
+### Configurable tag key names
+
+The tag key names shown above are defaults. You can override them to match your own tagging conventions using the following environment variables:
+
+| Environment variable | Default value | Description |
+|---|---|---|
+| `VENDING_TAG_ENVIRONMENT` | `itl-environment` | Tag key used to determine the target environment / management group |
+| `VENDING_TAG_AKS` | `itl-aks` | Tag key used to enable AKS/Flux setup |
+| `VENDING_TAG_BUDGET` | `itl-budget` | Tag key for the monthly budget amount in EUR |
+| `VENDING_TAG_OWNER` | `itl-owner` | Tag key for the budget alert e-mail address |
+
+For example, to use `myorg-environment` instead of `itl-environment`:
+
+```bash
+VENDING_TAG_ENVIRONMENT=myorg-environment
+VENDING_TAG_AKS=myorg-aks
+VENDING_TAG_BUDGET=cost-budget
+VENDING_TAG_OWNER=cost-owner
+```
