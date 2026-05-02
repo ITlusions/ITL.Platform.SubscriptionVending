@@ -106,10 +106,7 @@ See [`.env.example`](.env.example) for a full list.
 | `VENDING_AZURE_CLIENT_ID` | `""` | Service principal client ID (empty = Managed Identity) |
 | `VENDING_AZURE_CLIENT_SECRET` | `""` | Service principal secret |
 | `VENDING_ROOT_MANAGEMENT_GROUP` | `ITL` | Default management group for new subscriptions |
-| `VENDING_MG_PRODUCTION` | `ITL-Production` | Management group for `itl-environment=production` |
-| `VENDING_MG_STAGING` | `ITL-Staging` | Management group for `itl-environment=staging` |
-| `VENDING_MG_DEVELOPMENT` | `ITL-Development` | Management group for `itl-environment=development` |
-| `VENDING_MG_SANDBOX` | `ITL-Sandbox` | Management group for `itl-environment=sandbox` (also the fallback) |
+| `VENDING_ENVIRONMENT_MG_MAPPING` | *(JSON — see below)* | JSON mapping of environment names to management group names |
 | `VENDING_DEFAULT_ALERT_EMAIL` | `""` | Fallback e-mail for budget alerts when `itl-owner` tag is absent |
 | `VENDING_AUTHORIZATION_SERVICE_URL` | `http://itl-authorization:8004` | Internal authorization service |
 | `VENDING_KEYCLOAK_URL` | `http://keycloak:8080` | Keycloak base URL |
@@ -117,13 +114,32 @@ See [`.env.example`](.env.example) for a full list.
 | `VENDING_MOCK_MODE` | `false` | Enable `/webhook/test` mock endpoint |
 | `VENDING_EVENT_GRID_SAS_KEY` | `""` | SAS key for validating Event Grid deliveries |
 
+#### Environment → Management Group mapping
+
+`VENDING_ENVIRONMENT_MG_MAPPING` accepts a JSON object. Any number of custom environments can be added:
+
+```bash
+VENDING_ENVIRONMENT_MG_MAPPING='{
+  "production":  "ITL-Production",
+  "staging":     "ITL-Staging",
+  "development": "ITL-Development",
+  "sandbox":     "ITL-Sandbox",
+  "acceptance":  "ITL-Acceptance",
+  "test":        "ITL-Test",
+  "customer-a":  "CustomerA-Prod",
+  "customer-b":  "CustomerB-Prod"
+}'
+```
+
+If the `itl-environment` tag value is not found in the mapping, the subscription falls back to the `sandbox` management group (or `ITL-Sandbox` if that key is also absent).
+
 ### Tag-based provisioning
 
 Subscriptions can carry tags that control how they are provisioned:
 
 | Tag | Values | Effect |
 |-----|--------|--------|
-| `itl-environment` | `production`, `staging`, `development`, `sandbox` | Determines management group placement and policy enforcement mode |
+| `itl-environment` | Any string (e.g. `production`, `staging`, `acceptance`, `customer-a`) | Determines management group placement via `VENDING_ENVIRONMENT_MG_MAPPING`; unknown values fall back to the `sandbox` MG |
 | `itl-aks` | `true` / `false` | Signals that AKS base charts should be installed via Flux |
 | `itl-budget` | Amount in EUR (e.g. `500`) | Creates an Azure Cost Management budget alert |
 | `itl-owner` | E-mail address | Contact for budget alerts; overrides `VENDING_DEFAULT_ALERT_EMAIL` |
