@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from unittest.mock import MagicMock, patch
@@ -22,14 +23,19 @@ from subscription_vending.config import Settings  # noqa: E402
 # Helpers
 # ---------------------------------------------------------------------------
 
+_DEFAULT_MAPPING = {
+    "production": "ITL-Production",
+    "staging": "ITL-Staging",
+    "development": "ITL-Development",
+    "sandbox": "ITL-Sandbox",
+}
+
+
 def _make_settings(**kwargs) -> Settings:
     """Return a Settings instance with test defaults, overridden by kwargs."""
     defaults = {
         "azure_tenant_id": "test-tenant-id",
-        "mg_production": "ITL-Production",
-        "mg_staging": "ITL-Staging",
-        "mg_development": "ITL-Development",
-        "mg_sandbox": "ITL-Sandbox",
+        "environment_mg_mapping": json.dumps(_DEFAULT_MAPPING),
         "default_alert_email": "",
     }
     defaults.update(kwargs)
@@ -75,27 +81,75 @@ def test_enforcement_mode_non_production(env):
 # _resolve_management_group
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("env,expected_attr", [
-    ("production",  "mg_production"),
-    ("staging",     "mg_staging"),
-    ("development", "mg_development"),
-    ("sandbox",     "mg_sandbox"),
+@pytest.mark.parametrize("env,expected_mg", [
+    ("production",  "ITL-Production"),
+    ("staging",     "ITL-Staging"),
+    ("development", "ITL-Development"),
+    ("sandbox",     "ITL-Sandbox"),
 ])
-def test_resolve_management_group_known_environments(env, expected_attr):
+def test_resolve_management_group_known_environments(env, expected_mg):
     settings = _make_settings()
     result = _resolve_management_group(env, settings)
-    assert result == getattr(settings, expected_attr)
+    assert result == expected_mg
 
 
 def test_resolve_management_group_unknown_falls_back_to_sandbox():
     settings = _make_settings()
-    assert _resolve_management_group("unknown-env", settings) == settings.mg_sandbox
+    assert _resolve_management_group("unknown-env", settings) == "ITL-Sandbox"
 
 
 def test_resolve_management_group_uses_custom_settings():
-    settings = _make_settings(mg_production="CustomProdMG", mg_sandbox="CustomSandboxMG")
+    custom_mapping = json.dumps({"production": "CustomProdMG", "sandbox": "CustomSandboxMG"})
+    settings = _make_settings(environment_mg_mapping=custom_mapping)
     assert _resolve_management_group("production", settings) == "CustomProdMG"
     assert _resolve_management_group("unknown", settings) == "CustomSandboxMG"
+
+
+def test_resolve_management_group_custom_environment():
+    """Custom environment 'customer-a' should resolve to its MG from the mapping."""
+    custom_mapping = json.dumps({
+        "production": "ITL-Production",
+        "sandbox": "ITL-Sandbox",
+        "customer-a": "CustomerA-Prod",
+    })
+    settings = _make_settings(environment_mg_mapping=custom_mapping)
+    assert _resolve_management_group("customer-a", settings) == "CustomerA-Prod"
+
+
+def test_resolve_management_group_invalid_json_falls_back():
+    """Invalid JSON in environment_mg_mapping must not crash and returns safe default."""
+    settings = _make_settings(environment_mg_mapping="not-valid-json{{{")
+    # mg_mapping property returns {"sandbox": "ITL-Sandbox"} on JSONDecodeError
+    assert _resolve_management_group("production", settings) == "ITL-Sandbox"
+    assert _resolve_management_group("sandbox", settings) == "ITL-Sandbox"
+
+
+def test_mg_mapping_property_parses_json():
+    """mg_mapping property should return the parsed dict."""
+    settings = _make_settings()
+    mapping = settings.mg_mapping
+    assert mapping["production"] == "ITL-Production"
+    assert mapping["staging"] == "ITL-Staging"
+    assert mapping["development"] == "ITL-Development"
+    assert mapping["sandbox"] == "ITL-Sandbox"
+
+
+def test_mg_mapping_property_invalid_json_returns_fallback():
+    """mg_mapping property should return safe fallback on invalid JSON."""
+    settings = _make_settings(environment_mg_mapping="{{bad json}}")
+    assert settings.mg_mapping == {"sandbox": "ITL-Sandbox"}
+
+
+def test_default_mg_property():
+    """default_mg returns the sandbox MG from the mapping."""
+    settings = _make_settings()
+    assert settings.default_mg == "ITL-Sandbox"
+
+
+def test_default_mg_property_custom_sandbox():
+    """default_mg falls back to ITL-Sandbox when sandbox key is absent."""
+    settings = _make_settings(environment_mg_mapping=json.dumps({"production": "Prod-MG"}))
+    assert settings.default_mg == "ITL-Sandbox"
 
 
 # ---------------------------------------------------------------------------
@@ -137,15 +191,33 @@ async def test_read_config_itl_environment_tag(env_tag, expected_env, expected_m
 
 
 @pytest.mark.asyncio
-async def test_read_config_invalid_environment_falls_back_to_sandbox():
+async def test_read_config_unknown_environment_uses_default_mg():
+    """Unknown environment is accepted; MG resolves to the default (sandbox) MG."""
     settings = _make_settings()
     sub = _fake_subscription(tags={"itl-environment": "not-a-real-env"})
     with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-002", settings)
 
-    assert config.environment == "sandbox"
+    assert config.environment == "not-a-real-env"
     assert config.management_group_name == "ITL-Sandbox"
+
+
+@pytest.mark.asyncio
+async def test_read_config_custom_environment_from_mapping():
+    """Custom environment 'acceptance' resolves to its MG when present in mapping."""
+    custom_mapping = json.dumps({
+        **_DEFAULT_MAPPING,
+        "acceptance": "ITL-Acceptance",
+    })
+    settings = _make_settings(environment_mg_mapping=custom_mapping)
+    sub = _fake_subscription(tags={"itl-environment": "acceptance"})
+    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+        MockClient.return_value.subscriptions.get.return_value = sub
+        config = await read_subscription_config(MagicMock(), "sub-acc", settings)
+
+    assert config.environment == "acceptance"
+    assert config.management_group_name == "ITL-Acceptance"
 
 
 @pytest.mark.asyncio
@@ -241,10 +313,8 @@ async def test_read_config_tags_retrieval_failure_returns_defaults(caplog):
 @pytest.mark.asyncio
 async def test_read_config_custom_mg_names_from_settings():
     """MG names are driven by Settings, not hardcoded."""
-    settings = _make_settings(
-        mg_production="MyOrg-Prod",
-        mg_sandbox="MyOrg-Sandbox",
-    )
+    custom_mapping = json.dumps({"production": "MyOrg-Prod", "sandbox": "MyOrg-Sandbox"})
+    settings = _make_settings(environment_mg_mapping=custom_mapping)
     sub = _fake_subscription(tags={"itl-environment": "production"})
     with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
@@ -262,3 +332,4 @@ async def test_read_config_empty_tags_dict():
         config = await read_subscription_config(MagicMock(), "sub-010", settings)
 
     assert config == SubscriptionConfig(management_group_name="ITL-Sandbox")
+
