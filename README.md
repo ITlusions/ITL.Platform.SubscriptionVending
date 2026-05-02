@@ -3,6 +3,31 @@
 Subscription Vending is a FastAPI microservice that automatically provisions new Azure subscriptions after creation.  
 The service listens to Azure Event Grid events and executes a fixed provisioning workflow: management group placement, RBAC role assignments, policy assignments, and optional cost budget alerts.
 
+---
+
+## How it works
+
+1. Azure creates a subscription (`Microsoft.Subscription/aliases/write`).
+2. An Azure Event Grid system topic fires a `Microsoft.Resources.ResourceActionSuccess` event and delivers it via HTTP POST to `POST /webhook/` on this service.
+3. The service runs the provisioning workflow for the new subscription (Steps 0–6):
+
+   | Step | Action |
+   |------|--------|
+   | 0 | Read subscription tags — drives the remaining steps |
+   | 1 | Move the subscription to the correct management group |
+   | 2 | Attach the ITL Foundation Policy Initiative (via the Authorization service) |
+   | 3 | Create default RBAC role assignments |
+   | 4 | Assign default Azure Policy definitions |
+   | 5 | Create a Cost Management budget alert *(only when `itl-budget` tag is set)* |
+   | 6 | Publish an outbound `SubscriptionProvisioned` event *(only when `VENDING_EVENT_GRID_TOPIC_ENDPOINT` is set)* |
+
+4. A `ProvisioningResult` is logged. Each step is **independent** — a failure in one step is recorded but never prevents the remaining steps from running.
+5. The webhook always returns `200 OK` so Event Grid does not retry.
+
+See [docs/provisioning-workflow.md](./docs/provisioning-workflow.md) for full details on each step.
+
+---
+
 > **Detailed documentation** is available in the [`/docs`](./docs) folder:
 > - [Architecture overview](./docs/architecture.md)
 > - [Configuration reference](./docs/configuration.md)
@@ -117,6 +142,21 @@ curl -X POST http://localhost:8000/webhook/test \
 
 ---
 
+## API endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Liveness check — returns `{"status": "ok"}`. Used by Kubernetes probes. |
+| `POST /webhook/` | **Event Grid target URL.** Receives subscription-created events and runs the provisioning workflow. Also handles the Event Grid validation handshake. Configure `VENDING_EVENT_GRID_SAS_KEY` to restrict access. |
+| `POST /webhook/test` | Mock trigger for the provisioning workflow. Only available when `VENDING_MOCK_MODE=true`. |
+| `GET /docs` | Interactive Swagger UI (available when the service is running). |
+| `GET /redoc` | ReDoc API reference. |
+
+Point your Azure Event Grid subscription delivery endpoint to `https://<host>/webhook/`.  
+See [docs/api.md](./docs/api.md) for full request/response schemas.
+
+---
+
 ## Configuration
 
 All settings are loaded from environment variables with the `VENDING_` prefix (or from a `.env` file).  
@@ -140,6 +180,10 @@ See [`.env.example`](.env.example) for a full annotated list, and [docs/configur
 | `VENDING_MOCK_MODE` | `false` | Enable the `/webhook/test` mock endpoint |
 | `VENDING_EVENT_GRID_SAS_KEY` | `""` | SAS key for validating incoming Event Grid deliveries |
 | `VENDING_EVENT_GRID_TOPIC_ENDPOINT` | `""` | Event Grid Custom Topic endpoint for outbound `SubscriptionProvisioned` notification events. Leave empty to disable outbound notifications. |
+| `VENDING_TAG_ENVIRONMENT` | `itl-environment` | Tag key for the target environment / management group |
+| `VENDING_TAG_AKS` | `itl-aks` | Tag key to enable AKS/Flux setup |
+| `VENDING_TAG_BUDGET` | `itl-budget` | Tag key for the monthly budget amount in EUR |
+| `VENDING_TAG_OWNER` | `itl-owner` | Tag key for the budget alert e-mail address |
 
 #### Environment → Management Group mapping
 
