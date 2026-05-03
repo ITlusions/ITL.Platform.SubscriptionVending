@@ -1,26 +1,26 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Interactive Demo — ITL Subscription Vending</title>
+  <title>Automated Demo — ITL Subscription Vending</title>
   <style>
     :root {
-      --bg: #0d1117;
-      --surface: #161b22;
-      --surface2: #21262d;
-      --border: #30363d;
-      --accent: #1f6feb;
-      --accent-glow: rgba(31, 111, 235, 0.15);
-      --accent2: #58a6ff;
-      --text: #e6edf3;
-      --muted: #8b949e;
-      --success: #3fb950;
-      --warning: #d29922;
-      --error: #f85149;
-      --tag-bg: #1f3347;
-      --tag-text: #58a6ff;
-      --radius: 8px;
+      --bg:          #0d1117;
+      --surface:     #161b22;
+      --surface2:    #21262d;
+      --border:      #30363d;
+      --accent:      #1f6feb;
+      --accent-glow: rgba(31,111,235,0.15);
+      --accent2:     #58a6ff;
+      --text:        #e6edf3;
+      --muted:       #8b949e;
+      --success:     #3fb950;
+      --warning:     #d29922;
+      --error:       #f85149;
+      --tag-bg:      #1f3347;
+      --tag-text:    #58a6ff;
+      --radius:      8px;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,40 +35,27 @@
 
     a { color: var(--accent2); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    code {
-      font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
-      font-size: 0.88em;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 1px 6px;
-    }
 
-    /* ── Nav ──────────────────────────────────────────────── */
+    /* Nav */
     nav {
       position: sticky; top: 0; z-index: 100;
-      background: rgba(13,17,23,0.85);
+      background: rgba(13,17,23,0.92);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
       padding: 0 2rem;
       display: flex; align-items: center; justify-content: space-between;
       height: 56px;
     }
-    .nav-brand {
-      display: flex; align-items: center; gap: 10px;
-      font-weight: 600; font-size: 0.9rem; color: var(--text);
-    }
-    .nav-links {
-      display: flex; gap: 1.5rem; list-style: none; font-size: 0.875rem;
-    }
+    .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 0.9rem; }
+    .nav-links  { display: flex; gap: 1.5rem; list-style: none; font-size: 0.875rem; }
     .nav-links a { color: var(--muted); }
     .nav-links a:hover { color: var(--text); text-decoration: none; }
 
-    /* ── Hero ─────────────────────────────────────────────── */
+    /* Hero */
     .hero {
       text-align: center;
       padding: 4rem 2rem 3rem;
-      background: radial-gradient(ellipse at 50% 0%, rgba(31,111,235,0.12) 0%, transparent 70%);
+      background: radial-gradient(ellipse at 50% 0%, rgba(31,111,235,0.12) 0%, transparent 65%);
       border-bottom: 1px solid var(--border);
     }
     .hero-badge {
@@ -86,237 +73,178 @@
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       background-clip: text;
     }
-    .hero p {
-      font-size: 1rem; color: var(--muted);
-      max-width: 560px; margin: 0 auto 2rem;
-    }
+    .hero p { font-size: 1rem; color: var(--muted); max-width: 600px; margin: 0 auto 2rem; }
+    .hero-controls { display: flex; align-items: center; justify-content: center; gap: 0.75rem; flex-wrap: wrap; }
 
-    /* ── Layout ───────────────────────────────────────────── */
-    .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
-    .demo-layout {
-      display: grid;
-      grid-template-columns: 340px 1fr;
-      gap: 1.5rem;
-      padding: 2.5rem 0 4rem;
-      align-items: start;
-    }
+    /* Layout */
+    .container     { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+    .main-layout   { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; padding: 2rem 0 4rem; align-items: start; }
 
-    /* ── Panel ────────────────────────────────────────────── */
-    .panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
+    /* Panels */
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
     .panel-header {
-      background: var(--surface2);
-      border-bottom: 1px solid var(--border);
-      padding: 0.75rem 1rem;
-      font-size: 0.8rem; font-weight: 600;
-      color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase;
+      background: var(--surface2); border-bottom: 1px solid var(--border);
+      padding: 0.6rem 1rem;
+      font-size: 0.75rem; font-weight: 600; color: var(--muted);
+      letter-spacing: 0.07em; text-transform: uppercase;
       display: flex; align-items: center; gap: 8px;
     }
-    .panel-body { padding: 1.25rem; }
+    .panel-header-right { margin-left: auto; font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 0.72rem; }
 
-    /* ── Form ─────────────────────────────────────────────── */
-    .form-group { margin-bottom: 1rem; }
-    .form-group label {
-      display: block; font-size: 0.8rem; font-weight: 600;
-      color: var(--muted); margin-bottom: 0.35rem;
-    }
-    .form-group input, .form-group select {
-      width: 100%;
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: 6px; color: var(--text);
-      padding: 8px 10px; font-size: 0.875rem;
-      font-family: inherit;
-      transition: border-color 0.15s;
-      outline: none;
-    }
-    .form-group input:focus, .form-group select:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-glow);
-    }
-    .form-group input::placeholder { color: var(--muted); }
+    /* Scenario list */
+    .scenario-progress { padding: 0.65rem; display: flex; flex-direction: column; gap: 3px; }
+    .sp-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 0.8rem; }
+    .sp-item.pending  { color: var(--muted); }
+    .sp-item.active   { background: rgba(31,111,235,0.12); color: var(--accent2); font-weight: 600; }
+    .sp-item.done     { color: var(--success); }
+    .sp-item.done-err { color: var(--warning); }
+    .sp-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: currentColor; opacity: 0.5; }
+    .sp-item.active .sp-dot { opacity: 1; background: var(--accent2); }
+    .sp-item.done .sp-dot   { opacity: 1; background: var(--success); }
+    .sp-item.done-err .sp-dot { opacity: 1; background: var(--warning); }
+    .sp-name { flex: 1; }
+    .sp-num  { font-size: 0.68rem; color: var(--muted); font-family: monospace; }
+    .sp-desc { font-size: 0.72rem; color: var(--muted); padding: 1px 10px 6px 25px; }
 
-    .tag-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-    .tag-row { display: flex; flex-direction: column; }
-    .tag-row label { font-size: 0.75rem; color: var(--muted); margin-bottom: 3px; }
-    .tag-row input {
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: 6px; color: var(--text);
-      padding: 6px 8px; font-size: 0.8rem; font-family: monospace;
-      outline: none; transition: border-color 0.15s;
-    }
-    .tag-row input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-glow);
-    }
-
-    .section-divider {
-      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em;
-      text-transform: uppercase; color: var(--muted);
-      margin: 1.25rem 0 0.6rem;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .section-divider::after {
-      content: ""; flex: 1; height: 1px; background: var(--border);
-    }
-
-    .btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 10px 20px; border-radius: var(--radius);
-      font-size: 0.875rem; font-weight: 600; cursor: pointer;
-      transition: opacity 0.15s, transform 0.1s;
-      border: none; font-family: inherit; width: 100%;
-      justify-content: center; margin-top: 0.5rem;
-    }
-    .btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
-    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); margin-top: 0.5rem; }
-
-    /* ── Terminal / Output ────────────────────────────────── */
-    .output-panel { display: flex; flex-direction: column; gap: 1.25rem; }
-
-    .terminal {
-      background: #010409;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-    .terminal-bar {
-      background: var(--surface2);
-      border-bottom: 1px solid var(--border);
-      padding: 0.5rem 1rem;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .dot-red   { width: 12px; height: 12px; border-radius: 50%; background: #f85149; }
-    .dot-yellow{ width: 12px; height: 12px; border-radius: 50%; background: #d29922; }
-    .dot-green { width: 12px; height: 12px; border-radius: 50%; background: #3fb950; }
-    .terminal-title {
-      margin-left: auto; font-size: 0.75rem; color: var(--muted);
-      font-family: ui-monospace, monospace;
-    }
-    .terminal-body {
-      padding: 1rem 1.25rem;
-      font-family: ui-monospace, "Cascadia Code", monospace;
-      font-size: 0.82rem; line-height: 1.75;
-      min-height: 120px;
-      max-height: 420px;
-      overflow-y: auto;
-    }
-    .terminal-body::-webkit-scrollbar { width: 6px; }
-    .terminal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-    .log-info    { color: var(--accent2); }
-    .log-success { color: var(--success); }
-    .log-warn    { color: var(--warning); }
-    .log-error   { color: var(--error); }
-    .log-muted   { color: var(--muted); }
-    .log-white   { color: var(--text); }
-    .log-step    { color: #e3b341; font-weight: 600; }
-
-    /* ── Steps tracker ────────────────────────────────────── */
-    .steps-tracker {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-    .steps-list { padding: 0.75rem; display: flex; flex-direction: column; gap: 4px; }
-    .step-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 8px 10px; border-radius: 6px;
-      font-size: 0.82rem;
-      transition: background 0.2s;
-    }
-    .step-item.pending  { color: var(--muted); }
-    .step-item.running  { background: rgba(31,111,235,0.1); color: var(--accent2); }
-    .step-item.success  { background: rgba(63,185,80,0.08); color: var(--success); }
-    .step-item.skipped  { color: var(--muted); opacity: 0.6; }
-    .step-item.failed   { background: rgba(248,81,73,0.08); color: var(--error); }
-    .step-icon { width: 18px; text-align: center; flex-shrink: 0; font-size: 0.85rem; }
+    /* Steps */
+    .steps-list { padding: 0.6rem; display: flex; flex-direction: column; gap: 3px; }
+    .step-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; font-size: 0.8rem; transition: background 0.2s; }
+    .step-item.pending { color: var(--muted); }
+    .step-item.running { background: rgba(31,111,235,0.1); color: var(--accent2); }
+    .step-item.success { background: rgba(63,185,80,0.08); color: var(--success); }
+    .step-item.skipped { color: var(--muted); opacity: 0.55; }
+    .step-item.partial { background: rgba(210,153,34,0.1); color: var(--warning); }
+    .step-item.failed  { background: rgba(248,81,73,0.08); color: var(--error); }
+    .step-icon { width: 16px; text-align: center; flex-shrink: 0; font-size: 0.8rem; }
     .step-label { flex: 1; }
-    .step-time { font-size: 0.72rem; color: var(--muted); font-family: monospace; }
+    .step-time  { font-size: 0.68rem; color: var(--muted); font-family: monospace; }
 
-    /* ── Result card ──────────────────────────────────────── */
-    .result-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      display: none;
-    }
-    .result-card.visible { display: block; }
-    .result-header {
-      padding: 1rem 1.25rem;
-      display: flex; align-items: center; gap: 10px;
-      border-bottom: 1px solid var(--border);
-    }
-    .result-header.success { background: rgba(63,185,80,0.08); }
-    .result-header.partial { background: rgba(210,153,34,0.08); }
-    .result-title { font-weight: 600; font-size: 0.95rem; }
-    .result-body { padding: 1rem 1.25rem; }
-    .result-row {
-      display: flex; justify-content: space-between; align-items: baseline;
-      padding: 5px 0; border-bottom: 1px solid var(--border);
-      font-size: 0.83rem;
-    }
+    /* Result card */
+    .result-header { padding: 0.85rem 1rem; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+    .result-header.success { background: rgba(63,185,80,0.07); }
+    .result-header.partial { background: rgba(210,153,34,0.07); }
+    .result-title { font-weight: 600; font-size: 0.88rem; }
+    .result-body  { padding: 0.75rem 1rem; }
+    .result-row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 0.78rem; }
     .result-row:last-child { border-bottom: none; }
     .result-key { color: var(--muted); }
-    .result-val { color: var(--text); font-family: monospace; font-size: 0.8rem; max-width: 60%; text-align: right; word-break: break-all; }
-    .result-val.success { color: var(--success); }
-    .result-val.error   { color: var(--error); }
+    .result-val { color: var(--text); font-family: monospace; font-size: 0.77rem; max-width: 65%; text-align: right; word-break: break-all; }
+    .result-val.ok   { color: var(--success); }
+    .result-val.err  { color: var(--error); }
+    .result-val.warn { color: var(--warning); }
 
-    /* ── Event payload ────────────────────────────────────── */
+    /* Countdown */
+    .countdown-wrap { padding: 0 1rem 0.75rem; }
+    .countdown-text { font-size: 0.72rem; color: var(--muted); margin-bottom: 5px; }
+    .countdown-bar  { height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .countdown-fill { height: 100%; background: var(--accent2); border-radius: 2px; transition: width 0.1s linear; }
+
+    /* Right column */
+    .right-col { display: flex; flex-direction: column; gap: 1.25rem; }
+
+    /* HTTP request display */
+    .http-line {
+      display: flex; align-items: baseline; gap: 10px;
+      padding: 0.65rem 1rem;
+      background: var(--surface2); border-bottom: 1px solid var(--border);
+      font-family: monospace; font-size: 0.8rem;
+    }
+    .http-method { color: var(--success); font-weight: 700; }
+    .http-path   { color: var(--accent2); }
+    .http-header-row { display: flex; gap: 6px; padding: 2px 1rem; font-family: monospace; font-size: 0.74rem; }
+    .hk { color: var(--muted); min-width: 200px; }
+    .hv { color: var(--text); }
+
+    /* Tags strip */
+    .tags-strip { display: flex; flex-wrap: wrap; gap: 5px; padding: 0.65rem 1rem; border-top: 1px solid var(--border); background: var(--surface2); }
+    .tag-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--tag-bg); color: var(--tag-text);
+      border: 1px solid rgba(88,166,255,0.2);
+      border-radius: 4px; padding: 2px 8px;
+      font-size: 0.71rem; font-family: monospace;
+    }
+    .tag-chip span { color: var(--muted); }
+
+    /* JSON payload */
     .json-block {
-      background: #010409;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1rem 1.25rem;
-      font-family: ui-monospace, monospace;
-      font-size: 0.78rem; line-height: 1.65;
-      overflow-x: auto;
-      white-space: pre;
+      padding: 0.85rem 1rem;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 0.76rem; line-height: 1.65;
+      overflow-x: auto; white-space: pre;
       color: var(--muted);
+      max-height: 240px; overflow-y: auto;
     }
-    .json-key   { color: #79c0ff; }
-    .json-str   { color: #a5d6ff; }
-    .json-num   { color: #f2cc60; }
-    .json-bool  { color: #ff7b72; }
+    .json-block::-webkit-scrollbar { width: 5px; height: 5px; }
+    .json-block::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .jk { color: #79c0ff; }
+    .js { color: #a5d6ff; }
+    .jn { color: #f2cc60; }
+    .jb { color: #ff7b72; }
 
-    /* ── Spinner ──────────────────────────────────────────── */
+    /* Response grid */
+    .resp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
+    .resp-cell { background: var(--surface); padding: 0.65rem 1rem; font-size: 0.78rem; }
+    .resp-label { color: var(--muted); margin-bottom: 3px; font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; }
+    .resp-value { color: var(--text); font-family: monospace; word-break: break-all; }
+    .resp-value.ok   { color: var(--success); }
+    .resp-value.err  { color: var(--error); }
+    .resp-value.warn { color: var(--warning); }
+
+    /* Terminal */
+    .terminal { background: #010409; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .terminal-bar { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 0.45rem 1rem; display: flex; align-items: center; gap: 6px; }
+    .dot-r { width: 11px; height: 11px; border-radius: 50%; background: #f85149; }
+    .dot-y { width: 11px; height: 11px; border-radius: 50%; background: #d29922; }
+    .dot-g { width: 11px; height: 11px; border-radius: 50%; background: #3fb950; }
+    .t-title { margin-left: auto; font-size: 0.72rem; color: var(--muted); font-family: monospace; }
+    .terminal-body {
+      padding: 0.85rem 1rem;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 0.79rem; line-height: 1.8;
+      max-height: 400px; overflow-y: auto;
+    }
+    .terminal-body::-webkit-scrollbar { width: 5px; }
+    .terminal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .l-info  { color: var(--accent2); }
+    .l-ok    { color: var(--success); }
+    .l-warn  { color: var(--warning); }
+    .l-err   { color: var(--error); }
+    .l-muted { color: var(--muted); }
+    .l-step  { color: #e3b341; font-weight: 600; }
+
+    /* Spinner / dots */
     @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner {
-      display: inline-block; width: 12px; height: 12px;
-      border: 2px solid var(--border); border-top-color: var(--accent2);
-      border-radius: 50%; animation: spin 0.7s linear infinite;
-    }
+    .spinner { display: inline-block; width: 11px; height: 11px; border: 1.5px solid var(--border); border-top-color: var(--accent2); border-radius: 50%; animation: spin 0.65s linear infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+    .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--success); animation: pulse 1.1s ease-in-out infinite; flex-shrink: 0; }
+    .idle-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--warning); flex-shrink: 0; }
 
-    /* ── Idle prompt ──────────────────────────────────────── */
-    .idle-prompt {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; padding: 3rem 1rem;
-      gap: 0.75rem; color: var(--muted); text-align: center;
-      font-size: 0.85rem;
+    /* Controls */
+    .ctrl-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 20px; border-radius: var(--radius);
+      font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface2); color: var(--text);
+      font-family: inherit; transition: background 0.15s, border-color 0.15s;
     }
-    .idle-prompt svg { opacity: 0.3; }
+    .ctrl-btn:hover  { background: var(--surface); border-color: var(--accent); }
+    .ctrl-btn.primary{ background: var(--accent); border-color: var(--accent); color: #fff; }
+    .ctrl-btn.primary:hover { opacity: 0.85; }
+    .status-badge { display: inline-flex; align-items: center; gap: 7px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; font-size: 0.8rem; color: var(--muted); font-family: monospace; }
 
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 2rem; text-align: center;
-      font-size: 0.82rem; color: var(--muted);
-    }
+    .idle-hint { display: flex; flex-direction: column; align-items: center; padding: 1.75rem 1rem; gap: 0.6rem; color: var(--muted); text-align: center; font-size: 0.82rem; }
+    .idle-hint svg { opacity: 0.25; }
+
+    footer { border-top: 1px solid var(--border); padding: 2rem; text-align: center; font-size: 0.8rem; color: var(--muted); }
     footer a { color: var(--muted); }
     footer a:hover { color: var(--text); }
 
-    @media (max-width: 768px) {
-      .demo-layout { grid-template-columns: 1fr; }
-      .tag-grid { grid-template-columns: 1fr; }
+    @media (max-width: 860px) {
+      .main-layout { grid-template-columns: 1fr; }
+      .resp-grid   { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -324,7 +252,7 @@
 
 <nav>
   <div class="nav-brand">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
       <polyline points="9 22 9 12 15 12 15 22"/>
     </svg>
@@ -340,145 +268,122 @@
 
 <header class="hero">
   <div class="hero-badge">
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
-    Interactive Demo
+    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+    Automated Walkthrough
   </div>
-  <h1>See Subscription Vending in action</h1>
-  <p>Configure a subscription below, fire the Event Grid event, and watch the 7-step provisioning workflow run in real time.</p>
+  <h1>Subscription Vending — Live Demo</h1>
+  <p>Watch the full end-to-end provisioning workflow run automatically across five real-world scenarios. The inbound Event Grid webhook, all seven provisioning steps, and the HTTP response are shown in real time.</p>
+  <div class="hero-controls">
+    <div class="status-badge">
+      <span class="idle-dot" id="status-dot"></span>
+      <span id="status-label">Ready to start</span>
+    </div>
+    <button class="ctrl-btn primary" id="play-btn" onclick="adTogglePlay()">
+      <svg id="play-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <span id="play-label">Play</span>
+    </button>
+    <button class="ctrl-btn" onclick="adRestart()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+      Restart
+    </button>
+  </div>
 </header>
 
 <main>
   <div class="container">
-    <div class="demo-layout">
+    <div class="main-layout">
 
-      <!-- ── Left: config panel ── -->
+      <!-- Left column -->
       <div style="display:flex;flex-direction:column;gap:1.25rem;">
 
         <div class="panel">
           <div class="panel-header">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-            Subscription
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Scenarios
+            <span class="panel-header-right" id="scenario-counter">0 / 5</span>
           </div>
-          <div class="panel-body">
-            <div class="form-group">
-              <label>Subscription name</label>
-              <input id="sub-name" type="text" value="myteam-production" placeholder="myteam-production" />
-            </div>
-            <div class="form-group">
-              <label>Subscription ID</label>
-              <input id="sub-id" type="text" value="" placeholder="auto-generate" />
-            </div>
-            <div class="form-group">
-              <label>Management group (override)</label>
-              <input id="mg-override" type="text" value="" placeholder="derived from itl-environment tag" />
-            </div>
-          </div>
+          <div class="scenario-progress" id="scenario-progress"></div>
         </div>
 
         <div class="panel">
           <div class="panel-header">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-            Subscription Tags
-          </div>
-          <div class="panel-body">
-            <div class="tag-grid">
-              <div class="tag-row">
-                <label>itl-environment</label>
-                <input id="tag-env" type="text" value="production" />
-              </div>
-              <div class="tag-row">
-                <label>itl-budget (EUR)</label>
-                <input id="tag-budget" type="text" value="1000" />
-              </div>
-              <div class="tag-row">
-                <label>itl-owner</label>
-                <input id="tag-owner" type="text" value="platform@itlusions.com" />
-              </div>
-              <div class="tag-row">
-                <label>itl-aks</label>
-                <input id="tag-aks" type="text" value="false" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-header">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Scenario
-          </div>
-          <div class="panel-body">
-            <div class="form-group">
-              <label>Preset scenario</label>
-              <select id="scenario">
-                <option value="happy">Happy path — all steps succeed</option>
-                <option value="no-budget">No budget tag — step 5 skipped</option>
-                <option value="auth-fail">Authorization service down — step 2 fails</option>
-                <option value="rbac-partial">RBAC partial failure — 1 of 4 fails</option>
-                <option value="all-fail">Worst case — steps 1–4 fail</option>
-              </select>
-            </div>
-            <button class="btn btn-primary" id="run-btn" onclick="runDemo()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              Fire Event &amp; Run Workflow
-            </button>
-            <button class="btn btn-secondary" onclick="resetDemo()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
-              Reset
-            </button>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- ── Right: output panel ── -->
-      <div class="output-panel">
-
-        <!-- Event payload -->
-        <div class="panel">
-          <div class="panel-header">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/></svg>
-            Inbound Event Grid Event
-          </div>
-          <div class="panel-body" style="padding:0.75rem">
-            <div class="json-block" id="event-payload">
-<span class="log-muted">// Fill in the form and click "Fire Event" to see the Event Grid payload</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Steps tracker -->
-        <div class="steps-tracker">
-          <div class="panel-header">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             Provisioning Steps
           </div>
           <div class="steps-list" id="steps-list">
-            <div class="idle-prompt">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              <span>Click "Fire Event" to start the provisioning workflow</span>
+            <div class="idle-hint">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Press Play to begin</span>
             </div>
           </div>
         </div>
 
-        <!-- Workflow log -->
-        <div class="terminal">
-          <div class="terminal-bar">
-            <div class="dot-red"></div><div class="dot-yellow"></div><div class="dot-green"></div>
-            <span class="terminal-title">vending-service — provisioning log</span>
-          </div>
-          <div class="terminal-body" id="terminal-body">
-            <span class="log-muted">Waiting for event...</span>
-          </div>
-        </div>
-
-        <!-- Result -->
-        <div class="result-card" id="result-card">
+        <div class="panel" id="result-card" style="display:none;">
           <div class="result-header" id="result-header">
             <span id="result-icon"></span>
             <span class="result-title" id="result-title"></span>
           </div>
           <div class="result-body" id="result-body"></div>
+        </div>
+
+        <div id="countdown-wrap" style="display:none;">
+          <div class="countdown-text" id="countdown-text"></div>
+          <div class="countdown-bar"><div class="countdown-fill" id="countdown-fill" style="width:100%"></div></div>
+        </div>
+
+      </div>
+
+      <!-- Right column -->
+      <div class="right-col">
+
+        <!-- Inbound webhook -->
+        <div class="panel">
+          <div class="panel-header">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/></svg>
+            Inbound Webhook &mdash; Event Grid Notification
+            <span class="panel-header-right" id="webhook-status">waiting</span>
+          </div>
+          <div id="webhook-empty" class="idle-hint">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/></svg>
+            <span>Waiting for Event Grid notification</span>
+          </div>
+          <div id="webhook-content" style="display:none;">
+            <div class="http-line">
+              <span class="http-method">POST</span>
+              <span class="http-path">/webhook/</span>
+              <span style="color:var(--muted);margin-left:auto;font-size:0.71rem;">HTTP/1.1</span>
+            </div>
+            <div style="padding:5px 0 3px;">
+              <div class="http-header-row"><span class="hk">Host:</span><span class="hv">vending-service.azurewebsites.net</span></div>
+              <div class="http-header-row"><span class="hk">Content-Type:</span><span class="hv">application/json</span></div>
+              <div class="http-header-row"><span class="hk">aeg-event-type:</span><span class="hv">Notification</span></div>
+              <div class="http-header-row"><span class="hk">aeg-subscription-name:</span><span class="hv" id="wh-sub-name-hdr">&mdash;</span></div>
+              <div class="http-header-row"><span class="hk">aeg-delivery-count:</span><span class="hv">0</span></div>
+              <div class="http-header-row"><span class="hk">Content-Length:</span><span class="hv" id="wh-content-length">&mdash;</span></div>
+            </div>
+            <div class="json-block" id="webhook-payload"></div>
+            <div class="tags-strip" id="tags-strip"></div>
+          </div>
+        </div>
+
+        <!-- HTTP Response -->
+        <div class="panel" id="response-panel" style="display:none;">
+          <div class="panel-header">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            HTTP Response to Event Grid
+          </div>
+          <div class="resp-grid" id="response-grid"></div>
+        </div>
+
+        <!-- Terminal -->
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="dot-r"></div><div class="dot-y"></div><div class="dot-g"></div>
+            <span class="t-title" id="terminal-title">vending-service &mdash; provisioning log</span>
+          </div>
+          <div class="terminal-body" id="terminal-body">
+            <span class="l-muted">Waiting to start...</span>
+          </div>
         </div>
 
       </div>
@@ -490,9 +395,9 @@
   <p>
     &copy; <span id="yr"></span>
     <a href="https://github.com/ITlusions" target="_blank" rel="noopener">ITLusions</a>
-    &nbsp;·&nbsp;
+    &nbsp;&middot;&nbsp;
     <a href="https://github.com/ITlusions/ITL.Platform.SubscriptionVending" target="_blank" rel="noopener">GitHub</a>
-    &nbsp;·&nbsp;
+    &nbsp;&middot;&nbsp;
     MIT License
   </p>
 </footer>
@@ -500,7 +405,7 @@
 <script>
 document.getElementById("yr").textContent = new Date().getFullYear();
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function uuid() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -511,7 +416,7 @@ function uuid() {
 
 function pad(n) { return String(n).padStart(2, "0"); }
 
-function timestamp() {
+function ts() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T` +
          `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}Z`;
@@ -519,17 +424,25 @@ function timestamp() {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ── JSON syntax highlight ─────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 
 function highlightJson(obj) {
-  const raw = JSON.stringify(obj, null, 2);
-  return raw
-    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?)/g, m => {
-      if (/:$/.test(m)) return `<span class="json-key">${m}</span>`;
-      return `<span class="json-str">${m}</span>`;
-    })
-    .replace(/\b(true|false|null)\b/g, m => `<span class="json-bool">${m}</span>`)
-    .replace(/\b(-?\d+\.?\d*)\b/g, m => `<span class="json-num">${m}</span>`);
+  const lines = JSON.stringify(obj, null, 2).split("\n");
+  return lines.map(line => {
+    return line
+      .replace(/^(\s*)("[\w-]+")\s*:/,
+        (_, sp, key) => `${sp}<span class="jk">${key}</span>:`)
+      .replace(/:\s*("(?:[^"\\]|\\.)*")/,
+        (_, val) => `: <span class="js">${val}</span>`)
+      .replace(/:\s*(-?\d+\.?\d*)(\s*,?)$/,
+        (_, n, trail) => `: <span class="jn">${n}</span>${trail}`)
+      .replace(/:\s*(true|false|null)(\s*,?)$/,
+        (_, b, trail) => `: <span class="jb">${b}</span>${trail}`);
+  }).join("\n");
 }
 
 // ── Step definitions ──────────────────────────────────────────────────────────
@@ -544,165 +457,291 @@ const STEP_DEFS = [
   { id: 6, label: "Publish outbound event"        },
 ];
 
-// ── Scenario outcomes ─────────────────────────────────────────────────────────
+// ── Scenarios ─────────────────────────────────────────────────────────────────
+
+const SCENARIOS = [
+  {
+    label:    "Happy path",
+    desc:     "All 7 steps succeed",
+    sub:      { name: "finance-production",   env: "production",  budget: "2500", owner: "finance@itlusions.com",  aks: "false" },
+    scenario: "happy",
+  },
+  {
+    label:    "No budget tag",
+    desc:     "Step 5 skipped — budget alert omitted",
+    sub:      { name: "dev-sandbox-01",       env: "sandbox",     budget: "",     owner: "devteam@itlusions.com",  aks: "false" },
+    scenario: "no-budget",
+  },
+  {
+    label:    "Authorization service down",
+    desc:     "Step 2 fails — 503 from auth endpoint",
+    sub:      { name: "logistics-staging",    env: "staging",     budget: "500",  owner: "ops@itlusions.com",      aks: "false" },
+    scenario: "auth-fail",
+  },
+  {
+    label:    "RBAC partial failure",
+    desc:     "Step 3 partial — 3 of 4 assignments applied",
+    sub:      { name: "platform-development", env: "development", budget: "1000", owner: "platform@itlusions.com", aks: "true"  },
+    scenario: "rbac-partial",
+  },
+  {
+    label:    "Cascading failures",
+    desc:     "Steps 1–5 fail — worst-case scenario",
+    sub:      { name: "legacy-production",    env: "production",  budget: "5000", owner: "legacy@itlusions.com",   aks: "false" },
+    scenario: "all-fail",
+  },
+];
 
 function getOutcomes(scenario, hasBudget) {
-  const ok      = () => ({ result: "success", delay: 350 + Math.random() * 300 });
-  const fail    = msg => ({ result: "failed",  delay: 400 + Math.random() * 200, error: msg });
-  const skipped = msg => ({ result: "skipped", delay: 80, reason: msg });
+  const ok   = () => ({ result: "success", delay: 300 + Math.random() * 260 });
+  const fail = msg => ({ result: "failed",  delay: 360 + Math.random() * 180, error: msg });
+  const skip = msg => ({ result: "skipped", delay: 65,  reason: msg });
+  const bud  = hasBudget ? ok() : skip("itl-budget tag not set");
 
-  const base = {
-    happy:       [ok(), ok(), ok(), ok(), ok(), hasBudget ? ok() : skipped("itl-budget tag not set"), ok()],
-    "no-budget": [ok(), ok(), ok(), ok(), ok(), skipped("itl-budget tag not set"), ok()],
-    "auth-fail": [ok(), ok(), fail("503 Service Unavailable — authorization service down"), ok(), ok(), hasBudget ? ok() : skipped("itl-budget tag not set"), ok()],
-    "rbac-partial": [ok(), ok(), ok(), { result: "partial", delay: 500, note: "3/4 succeeded — ops-group assignment failed (403 Forbidden)" }, ok(), hasBudget ? ok() : skipped("itl-budget tag not set"), ok()],
-    "all-fail": [ok(), fail("ResourceNotFound — management group 'ITL-Production' does not exist"), fail("503 — authorization service unreachable"), fail("AuthorizationFailed — insufficient permissions"), fail("PolicyAssignmentFailed — scope locked"), hasBudget ? fail("ConsumptionQuotaExceeded") : skipped("itl-budget tag not set"), ok()],
-  };
-  return base[scenario] || base.happy;
+  return ({
+    happy:         [ok(), ok(), ok(), ok(), ok(), bud, ok()],
+    "no-budget":   [ok(), ok(), ok(), ok(), ok(), skip("itl-budget tag not set"), ok()],
+    "auth-fail":   [ok(), ok(), fail("503 Service Unavailable — authorization service unreachable"), ok(), ok(), bud, ok()],
+    "rbac-partial":[ok(), ok(), ok(), { result: "partial", delay: 460, note: "3/4 succeeded — ops-group assignment failed (403 Forbidden)" }, ok(), bud, ok()],
+    "all-fail":    [ok(),
+      fail("ResourceNotFound — management group 'ITL-Production' does not exist"),
+      fail("503 — authorization service unreachable"),
+      fail("AuthorizationFailed — insufficient permissions"),
+      fail("PolicyAssignmentFailed — scope locked"),
+      hasBudget ? fail("ConsumptionQuotaExceeded — budget limit reached") : skip("itl-budget tag not set"),
+      ok()],
+  })[scenario] || [ok(),ok(),ok(),ok(),ok(),ok(),ok()];
 }
 
 // ── DOM helpers ───────────────────────────────────────────────────────────────
 
-function log(cls, text) {
+function tlog(cls, text) {
   const el = document.getElementById("terminal-body");
   el.innerHTML += `<div class="${cls}">${text}</div>`;
   el.scrollTop = el.scrollHeight;
 }
 
 function renderSteps(states) {
-  const list = document.getElementById("steps-list");
-  list.innerHTML = STEP_DEFS.map((s, i) => {
+  document.getElementById("steps-list").innerHTML = STEP_DEFS.map((s, i) => {
     const st = states[i] || { status: "pending" };
-    let icon = "·";
-    if (st.status === "running")  icon = '<span class="spinner"></span>';
-    if (st.status === "success")  icon = "&#10003;";
-    if (st.status === "partial")  icon = "!";
-    if (st.status === "skipped")  icon = "–";
-    if (st.status === "failed")   icon = "&#10007;";
+    let icon = "&#183;";
+    if (st.status === "running") icon = '<span class="spinner"></span>';
+    if (st.status === "success") icon = "&#10003;";
+    if (st.status === "partial") icon = "!";
+    if (st.status === "skipped") icon = "&ndash;";
+    if (st.status === "failed")  icon = "&#10007;";
     return `<div class="step-item ${st.status || "pending"}">
       <span class="step-icon">${icon}</span>
-      <span class="step-label">${s.label}</span>
+      <span class="step-label">${esc(s.label)}</span>
       ${st.ms ? `<span class="step-time">${st.ms}ms</span>` : ""}
     </div>`;
   }).join("");
 }
 
-function showResult(subId, mgName, initiative, rbacRoles, errors, totalMs) {
+function renderScenarioList(activeIdx, doneMap) {
+  document.getElementById("scenario-progress").innerHTML = SCENARIOS.map((s, i) => {
+    let cls = "pending";
+    if (i === activeIdx)        cls = "active";
+    else if (doneMap[i] === true)  cls = "done";
+    else if (doneMap[i] === false) cls = "done-err";
+    const checkmark = (doneMap[i] === true)  ? " &#10003;" :
+                      (doneMap[i] === false) ? " !" : "";
+    return `<div class="sp-item ${cls}">
+      <span class="sp-dot"></span>
+      <span class="sp-name">${esc(s.label)}${checkmark}</span>
+      <span class="sp-num">${i + 1}/5</span>
+    </div>
+    <div class="sp-desc">${esc(s.desc)}</div>`;
+  }).join("");
+  document.getElementById("scenario-counter").textContent =
+    `${Object.keys(doneMap).length} / 5`;
+}
+
+function showWebhook(sub, subId, eventId) {
+  const mgMap = { production: "ITL-Production", staging: "ITL-Staging", development: "ITL-Development", sandbox: "ITL-Sandbox" };
+  const mg = mgMap[sub.env.toLowerCase()] || "ITL-Sandbox";
+
+  const payload = [{
+    id:              eventId,
+    eventType:       "Microsoft.Resources.ResourceActionSuccess",
+    subject:         `/subscriptions/${subId}`,
+    eventTime:       ts(),
+    dataVersion:     "1.0",
+    metadataVersion: "1",
+    data: {
+      operationName:    "Microsoft.Subscription/aliases/write",
+      status:           "Succeeded",
+      resourceUri:      `/subscriptions/${subId}`,
+      displayName:      sub.name,
+      tags: Object.fromEntries([
+        ["itl-environment", sub.env],
+        ...(sub.budget ? [["itl-budget", sub.budget]] : []),
+        ["itl-owner", sub.owner],
+        ["itl-aks",   sub.aks],
+      ]),
+      managementGroupId: mg,
+    },
+  }];
+
+  const raw = JSON.stringify(payload, null, 2);
+  document.getElementById("wh-sub-name-hdr").textContent  = `sub-${sub.name}`;
+  document.getElementById("wh-content-length").textContent = `${new Blob([raw]).size} bytes`;
+  document.getElementById("webhook-payload").innerHTML     = highlightJson(payload);
+  document.getElementById("webhook-status").textContent    = "received";
+
+  document.getElementById("tags-strip").innerHTML = Object.entries(payload[0].data.tags)
+    .map(([k, v]) => `<span class="tag-chip"><span>${esc(k)}</span>&nbsp;${esc(v)}</span>`)
+    .join("");
+
+  document.getElementById("webhook-empty").style.display   = "none";
+  document.getElementById("webhook-content").style.display = "block";
+
+  return { mg, payload };
+}
+
+function showResponse(success, errorCount, totalMs, subId) {
+  document.getElementById("response-panel").style.display = "block";
+  document.getElementById("response-grid").innerHTML = [
+    ["HTTP Status",      "200 OK",                           "ok"],
+    ["Content-Type",     "application/json",                 ""],
+    ["subscription_id",  subId,                              ""],
+    ["success",          String(success),                    success ? "ok" : "warn"],
+    ["errors",           errorCount ? `${errorCount} recorded` : "none", errorCount ? "err" : "ok"],
+    ["duration",         `${totalMs}ms`,                     ""],
+  ].map(([k, v, cls]) =>
+    `<div class="resp-cell">
+       <div class="resp-label">${esc(k)}</div>
+       <div class="resp-value ${cls}">${esc(v)}</div>
+     </div>`
+  ).join("");
+}
+
+function showResult(subId, mg, initiative, rbacCount, errors, totalMs) {
   const card    = document.getElementById("result-card");
   const header  = document.getElementById("result-header");
   const title   = document.getElementById("result-title");
   const icon    = document.getElementById("result-icon");
   const body    = document.getElementById("result-body");
   const success = errors.length === 0;
-  const partial = !success;
 
-  card.classList.add("visible");
-  header.className = `result-header ${success ? "success" : "partial"}`;
+  card.style.display = "block";
+  header.className   = `result-header ${success ? "success" : "partial"}`;
   icon.innerHTML = success
-    ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
-    : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
   title.textContent = success
-    ? "Provisioning completed successfully"
-    : `Provisioning completed with ${errors.length} error${errors.length > 1 ? "s" : ""}`;
+    ? "Provisioning completed — all steps succeeded"
+    : `Provisioning completed — ${errors.length} error${errors.length > 1 ? "s" : ""} recorded`;
 
   body.innerHTML = [
-    ["subscription_id",   subId,                               ""],
-    ["management_group",  mgName,                              ""],
-    ["initiative_id",     initiative || "(not attached)",      initiative ? "" : "error"],
-    ["rbac_roles",        rbacRoles.length ? `${rbacRoles.length} assignment(s)` : "0 (failed)", rbacRoles.length ? "success" : "error"],
-    ["errors",            errors.length ? errors.join("; ") : "none", errors.length ? "error" : "success"],
-    ["success",           String(success),                     success ? "success" : "error"],
-    ["total_duration",    `${totalMs}ms`,                      ""],
+    ["subscription_id",   subId,                                 ""],
+    ["management_group",  mg,                                     ""],
+    ["initiative_id",     initiative || "(not attached)",         initiative ? "" : "err"],
+    ["rbac_assignments",  rbacCount ? `${rbacCount} applied` : "0 (failed)", rbacCount ? "ok" : "err"],
+    ["errors_recorded",   errors.length || "none",                errors.length ? "err" : "ok"],
+    ["success",           String(success),                        success ? "ok" : "warn"],
+    ["total_duration",    `${totalMs}ms`,                         ""],
   ].map(([k, v, cls]) =>
     `<div class="result-row">
-       <span class="result-key">${k}</span>
-       <span class="result-val ${cls}">${v}</span>
+       <span class="result-key">${esc(k)}</span>
+       <span class="result-val ${cls}">${esc(String(v))}</span>
      </div>`
   ).join("");
 }
 
-// ── Main demo runner ──────────────────────────────────────────────────────────
+// ── Auto-demo engine ──────────────────────────────────────────────────────────
 
-let running = false;
+const COUNTDOWN_MS = 4500;
+let adPlaying      = false;
+let adIndex        = 0;
+let adRunning      = false;
+let adAbort        = false;
+let adCountdownRef = null;
+const adDoneMap    = {};
 
-async function runDemo() {
-  if (running) return;
-  running = true;
-  document.getElementById("run-btn").disabled = true;
+function setStatus(label, live) {
+  document.getElementById("status-label").textContent = label;
+  document.getElementById("status-dot").className = live ? "live-dot" : "idle-dot";
+}
 
-  // Collect inputs
-  const subName  = document.getElementById("sub-name").value.trim()  || "my-subscription";
-  const subId    = document.getElementById("sub-id").value.trim()    || uuid();
-  const mgOver   = document.getElementById("mg-override").value.trim();
-  const tagEnv   = document.getElementById("tag-env").value.trim()   || "sandbox";
-  const tagBudget= document.getElementById("tag-budget").value.trim();
-  const tagOwner = document.getElementById("tag-owner").value.trim();
-  const tagAks   = document.getElementById("tag-aks").value.trim();
-  const scenario = document.getElementById("scenario").value;
-  const hasBudget= !!tagBudget && parseInt(tagBudget) > 0;
+function setPlayBtn(playing) {
+  document.getElementById("play-label").textContent = playing ? "Pause" : "Play";
+  document.getElementById("play-btn").className     = playing ? "ctrl-btn" : "ctrl-btn primary";
+  document.getElementById("play-icon").innerHTML    = playing
+    ? `<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>`
+    : `<polygon points="5 3 19 12 5 21 5 3"/>`;
+}
 
-  // MG mapping
-  const mgMap = {
-    production: "ITL-Production", staging: "ITL-Staging",
-    development: "ITL-Development", sandbox: "ITL-Sandbox",
-  };
-  const resolvedMg = mgOver || mgMap[tagEnv.toLowerCase()] || "ITL-Sandbox";
+async function adRunScenario(def, idx) {
+  adRunning = true;
+  const subId     = uuid();
+  const eventId   = `evt-${uuid().slice(0, 8)}`;
+  const sub       = def.sub;
+  const hasBudget = !!sub.budget && parseInt(sub.budget) > 0;
 
-  // Build event payload
-  const event = [{
-    id: `evt-${uuid().slice(0,8)}`,
-    eventType: "Microsoft.Resources.ResourceActionSuccess",
-    subject: `/subscriptions/${subId}/resourceGroups/rg`,
-    dataVersion: "1.0",
-    eventTime: timestamp(),
-    data: {
-      operationName: "Microsoft.Subscription/aliases/write",
-      resourceUri: `/subscriptions/${subId}`,
-      displayName: subName,
-      managementGroupId: mgOver || "",
-    },
-  }];
+  // Reset panels
+  document.getElementById("result-card").style.display    = "none";
+  document.getElementById("response-panel").style.display = "none";
+  document.getElementById("countdown-wrap").style.display = "none";
+  document.getElementById("terminal-body").innerHTML      = "";
+  document.getElementById("terminal-title").textContent   = `vending-service \u2014 ${def.label}`;
+  document.getElementById("webhook-empty").style.display   = "block";
+  document.getElementById("webhook-content").style.display = "none";
+  document.getElementById("webhook-status").textContent    = "waiting";
 
-  // Render event payload
-  document.getElementById("event-payload").innerHTML = highlightJson(event);
-
-  // Clear terminal & result
-  document.getElementById("terminal-body").innerHTML = "";
-  document.getElementById("result-card").classList.remove("visible");
-
-  // Init step states
   const states = STEP_DEFS.map(() => ({ status: "pending" }));
   renderSteps(states);
+  renderScenarioList(idx, adDoneMap);
 
-  // Get outcomes
-  const outcomes = getOutcomes(scenario, hasBudget);
+  // ── Receive webhook ───────────────────────────────────────
+  tlog("l-muted", `${ts()} \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+  tlog("l-info",  `${ts()} POST /webhook/ &mdash; Event Grid notification received`);
+  tlog("l-muted", `  aeg-event-type       Notification`);
+  tlog("l-muted", `  event-id             ${eventId}`);
+  tlog("l-muted", `  subscription-id      ${subId}`);
+  tlog("l-muted", `  subscription-name    ${sub.name}`);
 
-  log("log-info", `[${timestamp()}] POST /webhook/ received`);
-  log("log-muted", `  aeg-event-type: Notification`);
-  log("log-muted", `  subscription-id: ${subId}`);
-  log("log-muted", `  event-id: ${event[0].id}`);
-  await sleep(300);
-  log("log-info", `[${timestamp()}] SAS key validation: OK`);
-  log("log-info", `[${timestamp()}] Event type matched: Microsoft.Subscription/aliases/write`);
-  log("log-info", `[${timestamp()}] Starting provisioning workflow for ${subName} (${subId})`);
+  const { mg } = showWebhook(sub, subId, eventId);
+
+  if (adAbort) { adRunning = false; return; }
+  await sleep(360);
+  if (adAbort) { adRunning = false; return; }
+
+  tlog("l-info",  `${ts()} SAS signature verified`);
+  tlog("l-muted", `  aeg-sas-key          sha256=***`);
+  tlog("l-info",  `${ts()} Event type matched &mdash; Microsoft.Subscription/aliases/write`);
+  tlog("l-muted", `  management_group     ${mg}`);
+  tlog("l-muted", `  environment          ${sub.env}`);
+  tlog("l-muted", `  enforcement_mode     ${sub.env === "production" ? "Default" : "DoNotEnforce"}`);
+
   await sleep(200);
+  if (adAbort) { adRunning = false; return; }
 
-  const errors = [];
-  const rbacRoles = [];
-  let initiative = "";
-  const startAll = Date.now();
+  tlog("l-info",  `${ts()} Starting provisioning workflow`);
+  tlog("l-muted", `  sub_id               ${subId}`);
+  tlog("l-muted", `  sub_name             ${sub.name}`);
+  tlog("l-muted", `  scenario             ${def.label}`);
+
+  // ── Steps ─────────────────────────────────────────────────
+  const outcomes  = getOutcomes(def.scenario, hasBudget);
+  const errors    = [];
+  let   rbacCount = 0;
+  let   initiative = "";
+  const t0 = Date.now();
 
   for (let i = 0; i < STEP_DEFS.length; i++) {
-    const step = STEP_DEFS[i];
+    if (adAbort) { adRunning = false; return; }
+
+    const step    = STEP_DEFS[i];
     const outcome = outcomes[i];
-    const tStart = Date.now();
+    const tStart  = Date.now();
 
     states[i] = { status: "running" };
     renderSteps(states);
-    log("log-step", `\n[Step ${i}] ${step.label}...`);
+    tlog("l-step", `\n${ts()} [step ${i}] ${esc(step.label)}`);
 
     await sleep(outcome.delay);
-
+    if (adAbort) { adRunning = false; return; }
     const ms = Date.now() - tStart;
 
     if (outcome.result === "success") {
@@ -710,73 +749,184 @@ async function runDemo() {
       renderSteps(states);
 
       if (i === 0) {
-        log("log-muted", `  itl-environment = ${tagEnv}`);
-        if (tagBudget) log("log-muted", `  itl-budget      = ${tagBudget}`);
-        if (tagOwner)  log("log-muted", `  itl-owner       = ${tagOwner}`);
-        if (tagAks)    log("log-muted", `  itl-aks         = ${tagAks}`);
-        log("log-muted", `  → target MG: ${resolvedMg}`);
-        log("log-muted", `  → enforcement: ${tagEnv === "production" ? "Default" : "DoNotEnforce"}`);
+        tlog("l-muted", `  itl-environment      ${sub.env}`);
+        if (sub.budget) tlog("l-muted", `  itl-budget           ${sub.budget} EUR`);
+        tlog("l-muted", `  itl-owner            ${sub.owner}`);
+        tlog("l-muted", `  itl-aks              ${sub.aks}`);
+        tlog("l-muted", `  resolved_mg          ${mg}`);
       }
-      if (i === 1) log("log-muted", `  /subscriptions/${subId} → ${resolvedMg}`);
-      if (i === 2) { initiative = `init-${uuid().slice(0,6)}`; log("log-muted", `  initiative_id: ${initiative}`); }
+      if (i === 1) {
+        tlog("l-muted", `  PATCH /managementGroups/${mg}/subscriptions/${subId}`);
+        tlog("l-muted", `  response             204 No Content`);
+        tlog("l-muted", `  moved from           ITL-Unmanaged`);
+      }
+      if (i === 2) {
+        initiative = `init-${uuid().slice(0, 6)}`;
+        tlog("l-muted", `  initiative_id        ${initiative}`);
+        tlog("l-muted", `  scope                /subscriptions/${subId}`);
+        tlog("l-muted", `  enforcement          ${sub.env === "production" ? "Default" : "DoNotEnforce"}`);
+        tlog("l-muted", `  PUT /policySetAssignments/${initiative}`);
+      }
       if (i === 3) {
-        const roles = ["Owner (platform-spn)", "Contributor (ops-group)", "Security Reader (security-group)", "Cost Mgmt Reader (finops-group)"];
-        roles.forEach(r => { rbacRoles.push(uuid()); log("log-muted", `  + ${r}`); });
+        const roles = [
+          ["Owner",            "platform-spn",   "Subscription"],
+          ["Contributor",      "ops-group",       "Subscription"],
+          ["Security Reader",  "security-group",  "Subscription"],
+          ["Cost Mgmt Reader", "finops-group",     "Subscription"],
+        ];
+        roles.forEach(([role, principal, scope]) => {
+          rbacCount++;
+          const assignId = uuid().slice(0, 8);
+          tlog("l-muted", `  + ${role.padEnd(18)} ${principal.padEnd(18)} id:${assignId}`);
+        });
       }
-      if (i === 4) log("log-muted", `  (no default policies configured — skipped silently)`);
-      if (i === 5) { log("log-muted", `  amount: ${tagBudget} EUR/month`); log("log-muted", `  contact: ${tagOwner || "VENDING_DEFAULT_ALERT_EMAIL"}`); log("log-muted", `  alerts at 80% and 100%`); }
-      if (i === 6) log("log-muted", `  ITL.SubscriptionVending.SubscriptionProvisioned → topic`);
-      log("log-success", `  [ok] completed in ${ms}ms`);
+      if (i === 4) {
+        tlog("l-muted", `  no default policy set configured`);
+        tlog("l-muted", `  step completed silently`);
+      }
+      if (i === 5) {
+        const budgetName = `budget-${sub.name}`;
+        tlog("l-muted", `  PUT /budgets/${budgetName}`);
+        tlog("l-muted", `  amount               ${sub.budget} EUR / month`);
+        tlog("l-muted", `  contact              ${sub.owner}`);
+        tlog("l-muted", `  thresholds           80% (forecast)  100% (actual)`);
+      }
+      if (i === 6) {
+        tlog("l-muted", `  POST /eventGrid/topics/ITL.SubscriptionVending`);
+        tlog("l-muted", `  event_type           SubscriptionProvisioned`);
+        tlog("l-muted", `  sub_id               ${subId}`);
+        tlog("l-muted", `  success              ${errors.length === 0}`);
+      }
+      tlog("l-ok", `  [ok] ${ms}ms`);
 
     } else if (outcome.result === "skipped") {
       states[i] = { status: "skipped", ms };
       renderSteps(states);
-      log("log-muted", `  skipped — ${outcome.reason}`);
+      tlog("l-muted", `  skipped &mdash; ${esc(outcome.reason)}`);
 
     } else if (outcome.result === "partial") {
       states[i] = { status: "partial", ms };
       renderSteps(states);
-      log("log-warn", `  [partial] ${outcome.note}`);
-      rbacRoles.push(uuid(), uuid(), uuid());
+      tlog("l-warn", `  [partial] ${esc(outcome.note)}`);
+      tlog("l-warn", `  3 of 4 role assignments applied`);
+      tlog("l-warn", `  ops-group assignment skipped &mdash; 403 Forbidden`);
+      rbacCount = 3;
       errors.push(`RBAC partial: ${outcome.note}`);
 
     } else {
       states[i] = { status: "failed", ms };
       renderSteps(states);
-      const err = `Step ${i} (${step.label}) failed: ${outcome.error}`;
-      errors.push(err);
-      log("log-error", `  [error] ${outcome.error}`);
-      log("log-warn", `  → error recorded, continuing to next step...`);
+      tlog("l-err",  `  [error] ${esc(outcome.error)}`);
+      tlog("l-warn", `  error recorded &mdash; continuing to next step`);
+      errors.push(`step ${i} (${step.label}): ${outcome.error}`);
     }
   }
 
-  const totalMs = Date.now() - startAll;
-
-  log("log-muted", "");
-  log("log-info", `[${timestamp()}] Workflow complete — returning 200 OK to Event Grid`);
-  log(errors.length ? "log-warn" : "log-success",
-    `  success: ${errors.length === 0} | errors: ${errors.length} | duration: ${totalMs}ms`);
+  const totalMs = Date.now() - t0;
+  tlog("l-muted", "");
+  tlog("l-info",  `${ts()} Workflow complete`);
+  tlog("l-muted", `  steps_run            ${STEP_DEFS.length}`);
+  tlog("l-muted", `  errors_recorded      ${errors.length}`);
+  tlog("l-muted", `  total_duration       ${totalMs}ms`);
+  tlog(errors.length ? "l-warn" : "l-ok",
+    `  HTTP response        200 OK &rarr; Event Grid`);
 
   renderSteps(states);
-  showResult(subId, resolvedMg, initiative, rbacRoles, errors, totalMs);
+  showResult(subId, mg, initiative, rbacCount, errors, totalMs);
+  showResponse(errors.length === 0, errors.length, totalMs, subId);
 
-  running = false;
-  document.getElementById("run-btn").disabled = false;
+  adDoneMap[idx] = errors.length === 0;
+  renderScenarioList(idx, adDoneMap);
+  adRunning = false;
 }
 
-function resetDemo() {
-  document.getElementById("terminal-body").innerHTML = '<span class="log-muted">Waiting for event...</span>';
-  document.getElementById("event-payload").innerHTML = '<span class="log-muted">// Fill in the form and click "Fire Event" to see the Event Grid payload</span>';
-  document.getElementById("result-card").classList.remove("visible");
-  document.getElementById("steps-list").innerHTML = `
-    <div class="idle-prompt">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-      <span>Click "Fire Event" to start the provisioning workflow</span>
-    </div>`;
-  document.getElementById("sub-id").value = "";
-  running = false;
-  document.getElementById("run-btn").disabled = false;
+async function adAdvance() {
+  if (!adPlaying) return;
+
+  const def = SCENARIOS[adIndex];
+  setStatus(`Scenario ${adIndex + 1}/5 \u2014 ${def.label}`, true);
+  await adRunScenario(def, adIndex);
+  if (adAbort || !adPlaying) return;
+
+  // Countdown
+  const nextIdx   = (adIndex + 1) % SCENARIOS.length;
+  const nextLabel = SCENARIOS[nextIdx].label;
+  const wrap      = document.getElementById("countdown-wrap");
+  const fill      = document.getElementById("countdown-fill");
+  const text      = document.getElementById("countdown-text");
+  wrap.style.display = "block";
+
+  const TICK  = 80;
+  const total = COUNTDOWN_MS / TICK;
+  let   step  = 0;
+
+  await new Promise(resolve => {
+    adCountdownRef = setInterval(() => {
+      if (adAbort || !adPlaying) { clearInterval(adCountdownRef); resolve(); return; }
+      step++;
+      fill.style.width = (100 - step / total * 100) + "%";
+      const secs = ((COUNTDOWN_MS - step * TICK) / 1000).toFixed(1);
+      text.textContent = `Next: ${nextLabel} \u2014 ${secs}s`;
+      if (step >= total) { clearInterval(adCountdownRef); resolve(); }
+    }, TICK);
+  });
+
+  wrap.style.display = "none";
+  if (adAbort || !adPlaying) return;
+  adIndex = nextIdx;
+  adAdvance();
 }
+
+async function adTogglePlay() {
+  if (!adPlaying) {
+    adPlaying = true;
+    adAbort   = false;
+    setPlayBtn(true);
+    if (!adRunning) adAdvance();
+  } else {
+    adPlaying = false;
+    adAbort   = true;
+    if (adCountdownRef) clearInterval(adCountdownRef);
+    document.getElementById("countdown-wrap").style.display = "none";
+    setPlayBtn(false);
+    setStatus("Paused", false);
+    await sleep(60);
+    adAbort   = false;
+    adRunning = false;
+  }
+}
+
+function adRestart() {
+  adPlaying = false;
+  adAbort   = true;
+  adRunning = false;
+  adIndex   = 0;
+  if (adCountdownRef) clearInterval(adCountdownRef);
+  Object.keys(adDoneMap).forEach(k => delete adDoneMap[k]);
+
+  setPlayBtn(false);
+  setStatus("Ready to start", false);
+
+  document.getElementById("terminal-body").innerHTML      = '<span class="l-muted">Waiting to start...</span>';
+  document.getElementById("terminal-title").textContent   = "vending-service \u2014 provisioning log";
+  document.getElementById("result-card").style.display    = "none";
+  document.getElementById("response-panel").style.display = "none";
+  document.getElementById("countdown-wrap").style.display = "none";
+  document.getElementById("webhook-empty").style.display   = "block";
+  document.getElementById("webhook-content").style.display = "none";
+  document.getElementById("webhook-status").textContent    = "waiting";
+  document.getElementById("steps-list").innerHTML =
+    `<div class="idle-hint">
+       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+       <span>Press Play to begin</span>
+     </div>`;
+
+  renderScenarioList(-1, {});
+  setTimeout(() => { adAbort = false; }, 80);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderScenarioList(-1, {});
 </script>
 </body>
 </html>
