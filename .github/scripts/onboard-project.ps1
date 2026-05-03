@@ -1,16 +1,30 @@
 ﻿<#
 .SYNOPSIS
-    Onboard a GitHub Project (v2) with sprint planning fields.
+    Onboard a GitHub Project (v2) with full Agile/Scrum fields and tooling.
 
 .DESCRIPTION
-    Creates or reuses an existing GitHub ProjectV2 in an organisation and adds:
-      - Sprint       (Iteration)
-      - Priority     (Single Select: Critical / High / Medium / Low)
-      - Story Points (Number)
-      - Category     (Single Select: configurable)
+    Creates or reuses a GitHub ProjectV2 and provisions:
 
-    Requires the GitHub CLI (gh) authenticated with the "project" scope:
-      gh auth login --scopes project
+    BASIC preset (always):
+      - Sprint        (Iteration)
+      - Priority      (Critical / High / Medium / Low)
+      - Story Points  (Number)
+      - Category      (configurable single-select)
+
+    FULL preset (default, adds):
+      - Type          (Epic / Story / Task / Bug / Spike)
+      - Effort        (XS / S / M / L / XL  -- T-shirt sizing)
+      - Epic          (free-text epic name)
+      - Blocked       (No / Yes)
+      - Risk          (None / Low / Medium / High)
+
+    Optionally:
+      - Creates GitHub Milestones for the first N sprints in the linked repo
+      - Creates issue labels for each Type value
+      - Links the repo to the project
+
+    Requires gh CLI authenticated with the "project" and "repo" scopes:
+      gh auth login --scopes project,repo
 
 .PARAMETER Org
     GitHub organisation login.  Default: ITlusions
@@ -19,84 +33,109 @@
     Display title for the project.
 
 .PARAMETER RepoName
-    Optional repository to link (format: owner/repo).
+    Repository to link (format: owner/repo). Also required for milestones + labels.
+
+.PARAMETER Preset
+    "basic" -- Sprint, Priority, Story Points, Category only.
+    "full"  -- basic + Type, Effort, Epic, Blocked, Risk.  (Default)
 
 .PARAMETER CategoryOptions
     Comma-separated Category options.
     Default: "Provisioning,Azure Integration,Infrastructure,Testing,Documentation,Security"
 
+.PARAMETER SprintCount
+    Create this many GitHub Milestones named "Sprint 1", "Sprint 2", ... in the repo.
+    Set to 0 to skip.  Default: 0
+
+.PARAMETER SprintLengthDays
+    Duration of each sprint in days (used for milestone due dates).  Default: 14
+
+.PARAMETER SprintStartDate
+    Start date for Sprint 1 (ISO: YYYY-MM-DD).  Default: today.
+
+.PARAMETER CreateLabels
+    Create GitHub issue labels for each Type option.  Requires RepoName.
+
 .PARAMETER SkipIfExists
-    Reuse an existing project with the same title instead of aborting.
+    Reuse an existing project instead of aborting when it already exists.
 
 .EXAMPLE
-    .\onboard-project.ps1 -ProjectTitle "My New Service" -RepoName "ITlusions/ITL.MyService"
+    # Minimal -- just sprint fields
+    .\onboard-project.ps1 -ProjectTitle "My Service" -Preset basic
 
 .EXAMPLE
+    # Full Agile with 6 sprints and type labels
+    .\onboard-project.ps1 `
+        -ProjectTitle "My Service" `
+        -RepoName     "ITlusions/ITL.MyService" `
+        -SprintCount  6 `
+        -CreateLabels
+
+.EXAMPLE
+    # Re-run on existing project (adds any missing fields only)
     .\onboard-project.ps1 -ProjectTitle "Subscription Vending" -SkipIfExists
 #>
 
 [CmdletBinding()]
 param(
-    [string]  $Org             = "ITlusions",
+    [string] $Org              = "ITlusions",
     [Parameter(Mandatory)][string] $ProjectTitle,
-    [string]  $RepoName        = "",
-    [string]  $CategoryOptions = "Provisioning,Azure Integration,Infrastructure,Testing,Documentation,Security",
-    [switch]  $SkipIfExists
+    [string] $RepoName         = "",
+    [ValidateSet("basic","full")]
+    [string] $Preset           = "full",
+    [string] $CategoryOptions  = "Provisioning,Azure Integration,Infrastructure,Testing,Documentation,Security",
+    [int]    $SprintCount      = 0,
+    [int]    $SprintLengthDays = 14,
+    [string] $SprintStartDate  = (Get-Date -Format "yyyy-MM-dd"),
+    [switch] $CreateLabels,
+    [switch] $SkipIfExists
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 # ---------------------------------------------------------------------------
-# Helper: call gh api graphql with query + optional variables hashtable
-# Variables are passed as -F key=value (gh handles the typing)
+# Helper: GraphQL via gh -f/-F flags
 # ---------------------------------------------------------------------------
 function Invoke-Gql {
-    param(
-        [string]    $Query,
-        [hashtable] $Variables = @{}
-    )
+    param([string]$Query, [hashtable]$Variables = @{})
     $ghArgs = [System.Collections.Generic.List[string]]::new()
     $ghArgs.AddRange([string[]]@("api", "graphql", "-f", "query=$Query"))
-    foreach ($k in $Variables.Keys) {
-        $ghArgs.Add("-F")
-        $ghArgs.Add("$k=$($Variables[$k])")
-    }
-    $raw    = & gh @ghArgs
-    $result = $raw | ConvertFrom-Json
+    foreach ($k in $Variables.Keys) { $ghArgs.Add("-F"); $ghArgs.Add("$k=$($Variables[$k])") }
+    $result = (& gh @ghArgs) | ConvertFrom-Json
     if ($result.PSObject.Properties["errors"] -and $null -ne $result.errors) {
         throw ($result.errors | ConvertTo-Json -Depth 5)
     }
     return $result.data
 }
 
+$totalSteps = if ($SprintCount -gt 0 -or $CreateLabels) { 8 } else { 6 }
+$step       = 0
+function Step { param([string]$Msg); $script:step++; Write-Host "[$script:step/$totalSteps] $Msg" -ForegroundColor Cyan }
+
 # ---------------------------------------------------------------------------
-# 1. Check gh auth
+# 1. Auth check
 # ---------------------------------------------------------------------------
-Write-Host ""
-Write-Host "[1/6] Checking gh authentication..." -ForegroundColor Cyan
-$authOut = gh auth status 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "gh CLI is not authenticated. Run: gh auth login"
-}
+Step "Checking gh authentication..."
+$authOut   = gh auth status 2>&1
+if ($LASTEXITCODE -ne 0) { Write-Error "gh CLI not authenticated. Run: gh auth login" }
 $scopeLine = $authOut | Where-Object { $_ -match "Token scopes" }
 if ($scopeLine -and ($scopeLine -notmatch "project")) {
-    Write-Warning "Token may be missing 'project' scope. Re-run: gh auth login --scopes project"
+    Write-Warning "Token may be missing 'project' scope. Re-run: gh auth login --scopes project,repo"
 }
 Write-Host "  OK" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
-# 2. Resolve org node ID
+# 2. Resolve org
 # ---------------------------------------------------------------------------
-Write-Host "[2/6] Resolving org '$Org'..." -ForegroundColor Cyan
-$orgData = Invoke-Gql -Query 'query($login: String!) { organization(login: $login) { id } }' -Variables @{ login = $Org }
-$orgId   = $orgData.organization.id
+Step "Resolving org '$Org'..."
+$orgId = (Invoke-Gql 'query($login: String!) { organization(login: $login) { id } }' @{ login = $Org }).organization.id
 Write-Host "  Org ID: $orgId" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
 # 3. Find or create project
 # ---------------------------------------------------------------------------
-Write-Host "[3/6] Looking for existing project '$ProjectTitle'..." -ForegroundColor Cyan
+Step "Finding project '$ProjectTitle'..."
 $projList = gh project list --owner $Org --format json | ConvertFrom-Json
 $existing = $projList.projects | Where-Object { $_.title -eq $ProjectTitle }
 
@@ -106,33 +145,32 @@ if ($existing) {
     }
     $projectNumber = $existing.number
     $projectId     = $existing.id
-    Write-Host "  Reusing existing project #$projectNumber (ID: $projectId)" -ForegroundColor Yellow
+    Write-Host "  Reusing #$projectNumber (ID: $projectId)" -ForegroundColor Yellow
 } else {
-    Write-Host "[3/6] Creating project '$ProjectTitle'..." -ForegroundColor Cyan
-    $createQ   = 'mutation($ownerId: ID!, $title: String!) { createProjectV2(input: { ownerId: $ownerId, title: $title }) { projectV2 { id number url } } }'
-    $pv2       = (Invoke-Gql -Query $createQ -Variables @{ ownerId = $orgId; title = $ProjectTitle }).createProjectV2.projectV2
-    $projectId     = $pv2.id
+    $createQ = 'mutation($ownerId: ID!, $title: String!) { createProjectV2(input: { ownerId: $ownerId, title: $title }) { projectV2 { id number url } } }'
+    $pv2     = (Invoke-Gql $createQ @{ ownerId = $orgId; title = $ProjectTitle }).createProjectV2.projectV2
     $projectNumber = $pv2.number
+    $projectId     = $pv2.id
     Write-Host "  Created: $($pv2.url)" -ForegroundColor Green
 }
 
 # ---------------------------------------------------------------------------
 # 4. Read existing fields
 # ---------------------------------------------------------------------------
-Write-Host "[4/6] Reading existing fields..." -ForegroundColor Cyan
-$fieldJson      = gh project field-list $projectNumber --owner $Org --format json | ConvertFrom-Json
-$existingFields = $fieldJson.fields | Select-Object -ExpandProperty name
-Write-Host "  Fields: $($existingFields -join ', ')" -ForegroundColor Gray
+Step "Reading existing fields..."
+$existingFields = (gh project field-list $projectNumber --owner $Org --format json | ConvertFrom-Json).fields |
+                    Select-Object -ExpandProperty name
+Write-Host "  Found: $($existingFields -join ', ')" -ForegroundColor Gray
 
 # ---------------------------------------------------------------------------
-# 5. Add missing sprint planning fields
+# 5. Add fields
 # ---------------------------------------------------------------------------
-Write-Host "[5/6] Adding sprint planning fields..." -ForegroundColor Cyan
+Step "Adding Agile fields (preset: $Preset)..."
 
 function Add-Field {
     param([string]$Name, [string]$DataType, [string[]]$Options = @())
     if ($existingFields -contains $Name) {
-        Write-Host "  SKIP '$Name' (already exists)" -ForegroundColor DarkGray
+        Write-Host "  SKIP  '$Name' (exists)" -ForegroundColor DarkGray
         return
     }
     if ($DataType -eq "SINGLE_SELECT" -and $Options.Count -gt 0) {
@@ -147,48 +185,133 @@ function Add-Field {
     Write-Host "  + $Name ($DataType)" -ForegroundColor Green
 }
 
-# Sprint uses ITERATION type -- only createable via GraphQL (gh CLI does not expose it)
+# Sprint -- ITERATION only available via GraphQL
 if ($existingFields -notcontains "Sprint") {
     $iterQ = 'mutation($pid: ID!, $nm: String!) { createProjectV2Field(input: { projectId: $pid, dataType: ITERATION, name: $nm }) { projectV2Field { ... on ProjectV2IterationField { id name } } } }'
-    Invoke-Gql -Query $iterQ -Variables @{ pid = $projectId; nm = "Sprint" } | Out-Null
+    Invoke-Gql $iterQ @{ pid = $projectId; nm = "Sprint" } | Out-Null
     Write-Host "  + Sprint (ITERATION)" -ForegroundColor Green
 } else {
-    Write-Host "  SKIP 'Sprint' (already exists)" -ForegroundColor DarkGray
+    Write-Host "  SKIP  'Sprint' (exists)" -ForegroundColor DarkGray
 }
 
+# --- BASIC fields ---
 Add-Field -Name "Priority"     -DataType "SINGLE_SELECT" -Options @("Critical","High","Medium","Low")
 Add-Field -Name "Story Points" -DataType "NUMBER"
 Add-Field -Name "Category"     -DataType "SINGLE_SELECT" -Options ($CategoryOptions -split ",")
 
+# --- FULL fields ---
+if ($Preset -eq "full") {
+    Add-Field -Name "Work Type" -DataType "SINGLE_SELECT" -Options @("Epic","Story","Task","Bug","Spike")
+    Add-Field -Name "Effort"  -DataType "SINGLE_SELECT" -Options @("XS","S","M","L","XL")
+    Add-Field -Name "Epic"    -DataType "TEXT"
+    Add-Field -Name "Blocked" -DataType "SINGLE_SELECT" -Options @("No","Yes")
+    Add-Field -Name "Risk"    -DataType "SINGLE_SELECT" -Options @("None","Low","Medium","High")
+}
+
 # ---------------------------------------------------------------------------
-# 6. Link repository (optional)
+# 6. Link repository
 # ---------------------------------------------------------------------------
+$repoId = $null
 if ($RepoName -ne "") {
-    Write-Host "[6/6] Linking repository '$RepoName'..." -ForegroundColor Cyan
+    Step "Linking repository '$RepoName'..."
     $parts  = $RepoName -split "/"
     $repoQ  = 'query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { id } }'
-    $repoId = (Invoke-Gql -Query $repoQ -Variables @{ owner = $parts[0]; name = $parts[1] }).repository.id
-
+    $repoId = (Invoke-Gql $repoQ @{ owner = $parts[0]; name = $parts[1] }).repository.id
     $linkQ  = 'mutation($pid: ID!, $rid: ID!) { linkProjectV2ToRepository(input: { projectId: $pid, repositoryId: $rid }) { repository { nameWithOwner } } }'
-    $linked = (Invoke-Gql -Query $linkQ -Variables @{ pid = $projectId; rid = $repoId }).linkProjectV2ToRepository.repository.nameWithOwner
+    $linked = (Invoke-Gql $linkQ @{ pid = $projectId; rid = $repoId }).linkProjectV2ToRepository.repository.nameWithOwner
     Write-Host "  Linked: $linked" -ForegroundColor Green
 } else {
-    Write-Host "[6/6] No repository specified - skipping link." -ForegroundColor DarkGray
+    Step "No repository specified - skipping link."
+    Write-Host "  (pass -RepoName owner/repo to link)" -ForegroundColor DarkGray
+}
+
+# ---------------------------------------------------------------------------
+# 7. Create sprint milestones (optional)
+# ---------------------------------------------------------------------------
+if ($SprintCount -gt 0) {
+    if ($RepoName -eq "") { Write-Warning "Skipping milestones: -RepoName is required."; $SprintCount = 0 }
+}
+
+if ($SprintCount -gt 0) {
+    Step "Creating $SprintCount sprint milestones..."
+    $start        = [datetime]::ParseExact($SprintStartDate, "yyyy-MM-dd", $null)
+    $msRaw        = gh api "repos/$RepoName/milestones?state=all&per_page=100" | ConvertFrom-Json
+    $existingMs   = @($msRaw) | Where-Object { $_ -and $_.PSObject.Properties["title"] } | Select-Object -ExpandProperty title
+
+    for ($i = 1; $i -le $SprintCount; $i++) {
+        $title  = "Sprint $i"
+        $due    = $start.AddDays($SprintLengthDays * $i).ToString("yyyy-MM-ddT00:00:00Z")
+        $descr  = "Sprint $i -- $($start.AddDays($SprintLengthDays * ($i - 1)).ToString('dd MMM')) to $($start.AddDays($SprintLengthDays * $i - 1).ToString('dd MMM yyyy'))"
+
+        if ($existingMs -contains $title) {
+            Write-Host "  SKIP  '$title' (exists)" -ForegroundColor DarkGray
+        } else {
+            gh api "repos/$RepoName/milestones" --method POST `
+                -f title="$title" -f description="$descr" -f due_on="$due" | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-Warning "Failed to create milestone '$title'" }
+            else { Write-Host "  + $title  (due $($start.AddDays($SprintLengthDays * $i).ToString('dd MMM yyyy')))" -ForegroundColor Green }
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 8. Create type labels (optional)
+# ---------------------------------------------------------------------------
+$typeLabelMap = @{
+    "Epic"  = @{ color = "6e40c9"; description = "Large body of work spanning multiple sprints" }
+    "Story" = @{ color = "0075ca"; description = "User story -- a piece of deliverable value" }
+    "Task"  = @{ color = "e4e669"; description = "Technical task or chore" }
+    "Bug"   = @{ color = "d73a4a"; description = "Something isn't working" }
+    "Spike" = @{ color = "f9d0c4"; description = "Research or investigation task" }
+}
+
+if ($CreateLabels) {
+    if ($RepoName -eq "") { Write-Warning "Skipping labels: -RepoName is required." }
+    else {
+        Step "Creating type labels..."
+        $labelsRaw      = gh label list -R $RepoName --limit 100 --json name | ConvertFrom-Json
+        $existingLabels = @($labelsRaw) | Where-Object { $_ -and $_.PSObject.Properties["name"] } | Select-Object -ExpandProperty name
+
+        foreach ($type in $typeLabelMap.Keys) {
+            $labelName = "type:$($type.ToLower())"
+            if ($existingLabels -contains $labelName) {
+                Write-Host "  SKIP  '$labelName' (exists)" -ForegroundColor DarkGray
+            } else {
+                gh label create $labelName `
+                    --color $typeLabelMap[$type].color `
+                    --description $typeLabelMap[$type].description `
+                    -R $RepoName | Out-Null
+                if ($LASTEXITCODE -ne 0) { Write-Warning "Failed to create label '$labelName'" }
+                else { Write-Host "  + $labelName" -ForegroundColor Green }
+            }
+        }
+    }
 }
 
 # ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
+$url = "https://github.com/orgs/$Org/projects/$projectNumber"
+
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host "  '$ProjectTitle' is ready for sprints!" -ForegroundColor White
+Write-Host "  '$ProjectTitle' is ready!  (preset: $Preset)" -ForegroundColor White
 Write-Host "  Number : #$projectNumber" -ForegroundColor White
-Write-Host "  URL    : https://github.com/orgs/$Org/projects/$projectNumber" -ForegroundColor White
+Write-Host "  URL    : $url" -ForegroundColor White
 Write-Host "================================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Fields added:" -ForegroundColor Yellow
+Write-Host "  Sprint, Priority, Story Points, Category"
+if ($Preset -eq "full") {
+    Write-Host "  Type, Effort, Epic, Blocked, Risk" -ForegroundColor Yellow
+}
 Write-Host ""
 Write-Host "Next steps (in the GitHub UI):" -ForegroundColor Yellow
-Write-Host "  1. Sprint field -> Settings -> set duration + start date"
-Write-Host "  2. Add a Board view (group by Status)"
-Write-Host "  3. Add a Sprint view (filter: current iteration)"
-Write-Host "  4. Assign Priority + Sprint to existing issues"
+Write-Host "  1. Sprint -> Settings -> set duration + start date"
+Write-Host "  2. Add a Board view  (group by Status)"
+Write-Host "  3. Add a Sprint view (group by Sprint, filter: current iteration)"
+Write-Host "  4. Add a Backlog view (no Sprint filter, sort by Priority)"
+if ($Preset -eq "full") {
+    Write-Host "  5. Add an Epics view (filter Work Type = Epic, group by Epic)"
+}
 Write-Host ""
