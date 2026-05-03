@@ -535,13 +535,13 @@ function highlightJson(obj) {
 // ── Step definitions ──────────────────────────────────────────────────────────
 
 const STEP_DEFS = [
-  { id: 0, label: "Read subscription tags",        icon: "🏷️" },
-  { id: 1, label: "Move to management group",      icon: "📁" },
-  { id: 2, label: "Attach Foundation Initiative",  icon: "📋" },
-  { id: 3, label: "Create RBAC role assignments",  icon: "🔑" },
-  { id: 4, label: "Assign default policies",       icon: "🛡️" },
-  { id: 5, label: "Create budget alert",           icon: "💰" },
-  { id: 6, label: "Publish outbound event",        icon: "📡" },
+  { id: 0, label: "Read subscription tags"        },
+  { id: 1, label: "Move to management group"      },
+  { id: 2, label: "Attach Foundation Initiative"  },
+  { id: 3, label: "Create RBAC role assignments"  },
+  { id: 4, label: "Assign default policies"       },
+  { id: 5, label: "Create budget alert"           },
+  { id: 6, label: "Publish outbound event"        },
 ];
 
 // ── Scenario outcomes ─────────────────────────────────────────────────────────
@@ -573,15 +573,15 @@ function renderSteps(states) {
   const list = document.getElementById("steps-list");
   list.innerHTML = STEP_DEFS.map((s, i) => {
     const st = states[i] || { status: "pending" };
-    let icon = "○";
+    let icon = "·";
     if (st.status === "running")  icon = '<span class="spinner"></span>';
-    if (st.status === "success")  icon = "✓";
-    if (st.status === "partial")  icon = "⚠";
+    if (st.status === "success")  icon = "&#10003;";
+    if (st.status === "partial")  icon = "!";
     if (st.status === "skipped")  icon = "–";
-    if (st.status === "failed")   icon = "✗";
+    if (st.status === "failed")   icon = "&#10007;";
     return `<div class="step-item ${st.status || "pending"}">
       <span class="step-icon">${icon}</span>
-      <span class="step-label">${s.icon} ${s.label}</span>
+      <span class="step-label">${s.label}</span>
       ${st.ms ? `<span class="step-time">${st.ms}ms</span>` : ""}
     </div>`;
   }).join("");
@@ -598,7 +598,9 @@ function showResult(subId, mgName, initiative, rbacRoles, errors, totalMs) {
 
   card.classList.add("visible");
   header.className = `result-header ${success ? "success" : "partial"}`;
-  icon.textContent = success ? "✅" : "⚠️";
+  icon.innerHTML = success
+    ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+    : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
   title.textContent = success
     ? "Provisioning completed successfully"
     : `Provisioning completed with ${errors.length} error${errors.length > 1 ? "s" : ""}`;
@@ -724,7 +726,7 @@ async function runDemo() {
       if (i === 4) log("log-muted", `  (no default policies configured — skipped silently)`);
       if (i === 5) { log("log-muted", `  amount: ${tagBudget} EUR/month`); log("log-muted", `  contact: ${tagOwner || "VENDING_DEFAULT_ALERT_EMAIL"}`); log("log-muted", `  alerts at 80% and 100%`); }
       if (i === 6) log("log-muted", `  ITL.SubscriptionVending.SubscriptionProvisioned → topic`);
-      log("log-success", `  ✓ completed in ${ms}ms`);
+      log("log-success", `  [ok] completed in ${ms}ms`);
 
     } else if (outcome.result === "skipped") {
       states[i] = { status: "skipped", ms };
@@ -734,7 +736,7 @@ async function runDemo() {
     } else if (outcome.result === "partial") {
       states[i] = { status: "partial", ms };
       renderSteps(states);
-      log("log-warn", `  ⚠ partial — ${outcome.note}`);
+      log("log-warn", `  [partial] ${outcome.note}`);
       rbacRoles.push(uuid(), uuid(), uuid());
       errors.push(`RBAC partial: ${outcome.note}`);
 
@@ -743,7 +745,7 @@ async function runDemo() {
       renderSteps(states);
       const err = `Step ${i} (${step.label}) failed: ${outcome.error}`;
       errors.push(err);
-      log("log-error", `  ✗ ${outcome.error}`);
+      log("log-error", `  [error] ${outcome.error}`);
       log("log-warn", `  → error recorded, continuing to next step...`);
     }
   }
