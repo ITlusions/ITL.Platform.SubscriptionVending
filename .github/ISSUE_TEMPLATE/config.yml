@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Docs site
+    url: https://itlusions.github.io/ITL.Platform.SubscriptionVending/
+    about: Architecture, API reference, configuration guide, and more
+
+  - name: GitHub Project board
+    url: https://github.com/orgs/ITlusions/projects/21
+    about: Sprint board and backlog for this repo
+
+  - name: Security vulnerability
+    url: https://github.com/ITlusions/ITL.Platform.SubscriptionVending/security/advisories/new
+    about: Please report security issues via a private advisory, not a public issue
