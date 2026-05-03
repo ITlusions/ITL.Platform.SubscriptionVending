@@ -141,6 +141,127 @@ The ServiceNow gate check (if configured) is executed with a **real HTTP call** 
 
 ---
 
+### `POST /webhook/replay`
+
+Idempotent re-trigger of the provisioning workflow for any subscription, without requiring a real Event Grid event. All provisioning steps are safe to repeat — duplicate management group moves and role assignments are no-ops in Azure.
+
+Always available (not gated by `VENDING_MOCK_MODE`). Optionally secured via the `x-replay-secret` header checked against `VENDING_WORKER_SECRET`.
+
+#### Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `x-replay-secret` | Conditional | Must match `VENDING_WORKER_SECRET` when that setting is non-empty. |
+
+#### Request body
+
+```json
+{
+  "subscription_id": "00000000-0000-0000-0000-000000000001",
+  "subscription_name": "my-subscription",
+  "management_group_id": "ITL-Development",
+  "dry_run": false
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `subscription_id` | `string` | Yes | — | Subscription ID to provision |
+| `subscription_name` | `string` | No | `""` | Display name |
+| `management_group_id` | `string` | No | `""` | Target management group (subscription tags take precedence) |
+| `dry_run` | `boolean` | No | `false` | When `true`, simulate the workflow without making any Azure changes |
+
+#### Response `200 OK`
+
+```json
+{
+  "status": "ok",
+  "subscription_id": "00000000-0000-0000-0000-000000000001",
+  "errors": [],
+  "plan": ["[STEP_MG] Moved to ITL-Development", "[STEP_RBAC] Assigned Owner to platform SPN"]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | `string` | `"ok"` on success, `"error"` if any provisioning step failed |
+| `subscription_id` | `string` | Echo of the requested subscription ID |
+| `errors` | `list[string]` | Error messages from failed steps |
+| `plan` | `list[string]` | Human-readable log of steps that ran (populated in `dry_run` mode and live runs) |
+
+#### Error responses
+
+| Code | Reason |
+|------|--------|
+| `401 Unauthorized` | `x-replay-secret` header does not match `VENDING_WORKER_SECRET` |
+
+---
+
+### `POST /worker/process-job` *(queue strategy only)*
+
+Processes a single provisioning job dequeued from Azure Storage Queue. Only mounted when `VENDING_RETRY_STRATEGY=queue`.
+
+Designed to be called by a queue trigger (Azure Functions, ACA Job, or Kubernetes CronJob) that passes the raw queue message payload in the request body.
+
+A `500` response leaves the message in the queue so the caller can retry. After `VENDING_QUEUE_MAX_DELIVERY_COUNT` failures the worker moves the message to the dead-letter queue and returns `200`.
+
+#### Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `x-worker-secret` | Conditional | Must match `VENDING_WORKER_SECRET` when that setting is non-empty. |
+
+#### Request body
+
+```json
+{
+  "message": "<base64-encoded ProvisioningJob JSON>",
+  "delivery_count": 1
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `message` | `string` | Yes | — | Base64-encoded JSON of a `ProvisioningJob` object |
+| `delivery_count` | `integer` | No | `1` | Number of times this message has been delivered. When this exceeds `VENDING_QUEUE_MAX_DELIVERY_COUNT` the job is dead-lettered. |
+
+**`ProvisioningJob` JSON fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `subscription_id` | `string` | Azure subscription ID |
+| `subscription_name` | `string` | Display name |
+| `management_group_id` | `string` | Target management group |
+| `attempt` | `integer` | Attempt counter (informational) |
+| `job_id` | `string` | UUID assigned at enqueue time (idempotency key) |
+
+#### Response `200 OK` — success
+
+```json
+{"status": "ok", "subscription_id": "00000000-0000-0000-0000-000000000001"}
+```
+
+#### Response `200 OK` — dead-lettered
+
+```json
+{"status": "dead_lettered", "subscription_id": "00000000-0000-0000-0000-000000000001"}
+```
+
+#### Response `500` — provisioning failed (message will be retried)
+
+```json
+{"detail": "Provisioning failed"}
+```
+
+#### Error responses
+
+| Code | Reason |
+|------|--------|
+| `401 Unauthorized` | `x-worker-secret` header does not match `VENDING_WORKER_SECRET` |
+| `422 Unprocessable Entity` | `message` field is not valid base64 or not valid JSON |
+
+---
+
 ### `POST /webhook/test` *(mock mode only)*
 
 Triggers the provisioning workflow directly without a real Event Grid event. Only available when `VENDING_MOCK_MODE=true`.

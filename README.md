@@ -27,9 +27,18 @@ The service listens to Azure Event Grid events and executes a fixed provisioning
    | Step 6 | Publish an outbound `SubscriptionProvisioned` event *(only when `VENDING_EVENT_GRID_TOPIC_ENDPOINT` is set)* |
 
 4. A `ProvisioningResult` is logged. Each provisioning step is **independent** by default — a failure is recorded but does not stop subsequent steps.
-5. The webhook always returns `200 OK` so Event Grid does not retry.
+5. A `ProvisioningResult` is logged. Each step is **independent** — a failure is recorded but does not stop subsequent steps.
+6. The retry strategy (`VENDING_RETRY_STRATEGY`) controls how failures are handled:
 
-See [docs/provisioning-workflow.md](./docs/provisioning-workflow.md) for full details on each step.
+   | Strategy | Behaviour |
+   |----------|-----------|
+   | `none` *(default)* | Runs inline, always returns `200`. Failures are logged only. |
+   | `dead_letter` | Runs inline, returns `500` on failure — Event Grid retries up to its configured limit. |
+   | `queue` | Enqueues a `ProvisioningJob` to Azure Storage Queue and returns `200`. A separate `POST /worker/process-job` consumer processes jobs asynchronously. |
+
+7. Use `POST /webhook/replay` to manually re-trigger provisioning for any subscription without a real Event Grid event.
+
+See [docs/provisioning-workflow.md](./docs/provisioning-workflow.md) for full details on each step, and [docs/configuration.md](./docs/configuration.md) for all retry strategy settings.
 
 ---
 
@@ -67,7 +76,8 @@ ITL.Platform.SubscriptionVending/
 │   ├── main.bicep
 │   ├── params.bicepparam
 │   └── modules/
-│       └── subscriptionOwnerRoleAssignment.bicep
+│       ├── subscriptionOwnerRoleAssignment.bicep
+│       └── mgVendingRoleAssignment.bicep
 ├── k8s/
 │   ├── deployment.yaml
 │   ├── service.yaml
@@ -81,7 +91,13 @@ ITL.Platform.SubscriptionVending/
         ├── handlers/
         │   ├── event_grid.py
         │   ├── mock.py
-        │   └── preflight.py
+        │   ├── preflight.py
+        │   ├── replay.py
+        │   └── worker.py
+        ├── retry/
+        │   ├── dispatcher.py
+        │   ├── models.py
+        │   └── queue_client.py
         ├── extensions/
         │   ├── _webhook_notify.py
         │   ├── _api_notify.py
@@ -163,8 +179,10 @@ curl -X POST http://localhost:8000/webhook/test \
 | Endpoint | Description |
 |----------|-------------|
 | `GET /health` | Liveness check — returns `{"status": "ok"}`. Used by Kubernetes probes. |
-| `POST /webhook/` | **Event Grid target URL.** Receives subscription-created events and runs the provisioning workflow. Also handles the Event Grid validation handshake. Configure `VENDING_EVENT_GRID_SAS_KEY` to restrict access. |
+| `POST /webhook/` | **Event Grid target URL.** Receives subscription-created events and triggers the provisioning dispatcher. Handles the Event Grid validation handshake. Configure `VENDING_EVENT_GRID_SAS_KEY` to restrict access. |
 | `POST /webhook/preflight` | **Dry-run validation.** Validates the ServiceNow ticket (read-only) and returns a structured plan of what provisioning would do — without making any Azure changes. |
+| `POST /webhook/replay` | **Manual re-trigger.** Idempotent replay of the provisioning workflow for any subscription. Supports `dry_run`. Optionally secured via `VENDING_WORKER_SECRET`. |
+| `POST /worker/process-job` | **Queue worker.** Processes a single base64-encoded `ProvisioningJob` message from an Azure Storage Queue. Only active when `VENDING_RETRY_STRATEGY=queue`. |
 | `POST /webhook/test` | Mock trigger for the provisioning workflow. Only available when `VENDING_MOCK_MODE=true`. |
 | `GET /docs` | Interactive Swagger UI (available when the service is running). |
 | `GET /redoc` | ReDoc API reference. |
@@ -210,6 +228,13 @@ See [`.env.example`](.env.example) for a full annotated list, and [docs/configur
 | `VENDING_SNOW_TIMEOUT` | `10` | HTTP timeout in seconds for ServiceNow calls |
 | `VENDING_SNOW_SUCCESS_STATE` | `""` | State to set on ticket after successful provisioning |
 | `VENDING_SNOW_FAILURE_STATE` | `""` | State to set on ticket after failed provisioning |
+| `VENDING_RETRY_STRATEGY` | `none` | Retry strategy: `none` (inline, always 200), `dead_letter` (500 on failure, lets Event Grid retry), `queue` (enqueue to Azure Storage Queue for async retry) |
+| `VENDING_STORAGE_ACCOUNT_NAME` | `""` | Azure Storage Account name for the `queue` retry strategy |
+| `VENDING_PROVISIONING_QUEUE_NAME` | `provisioning-jobs` | Work queue name |
+| `VENDING_PROVISIONING_DLQ_NAME` | `provisioning-jobs-deadletter` | Dead-letter queue name |
+| `VENDING_QUEUE_MAX_DELIVERY_COUNT` | `5` | Failures before a queue message is moved to the DLQ |
+| `VENDING_QUEUE_VISIBILITY_TIMEOUT` | `30` | Seconds before a failed queue message reappears |
+| `VENDING_WORKER_SECRET` | `""` | Shared secret for `POST /worker/process-job` and `POST /webhook/replay`. Leave empty to allow unauthenticated access (private networks only). |
 
 #### Environment → Management Group mapping
 

@@ -179,6 +179,28 @@ Provisioning step that PATCHes the ServiceNow ticket with the outcome after `STE
 | `VENDING_SNOW_FAILURE_STATE` | `""` | `state` value to set when provisioning fails (e.g. `4` = Closed Incomplete). Leave empty to not change state. |
 | `VENDING_SNOW_TIMEOUT` | `10` | HTTP timeout in seconds. |
 
+### Retry strategy (`retry/`)
+
+Controls how the service handles provisioning failures. Select a strategy via `VENDING_RETRY_STRATEGY`.
+
+| Strategy | Behaviour |
+|----------|-----------|
+| `none` *(default)* | Runs the provisioning workflow inline and always returns `200 OK` to Event Grid. Failures are logged but not retried. |
+| `dead_letter` | Runs inline but returns `500` on failure, causing Event Grid to retry according to its own retry policy and eventually dead-letter the event. |
+| `queue` | Immediately enqueues a `ProvisioningJob` to Azure Storage Queue and returns `200`. A separate worker (`POST /worker/process-job`) processes jobs asynchronously with configurable max delivery and dead-letter support. |
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VENDING_RETRY_STRATEGY` | `none` | Retry strategy: `none`, `dead_letter`, or `queue`. |
+| `VENDING_STORAGE_ACCOUNT_NAME` | `""` | Azure Storage Account name. Required when `VENDING_RETRY_STRATEGY=queue`. The Managed Identity must have **Storage Queue Data Contributor** on this account. |
+| `VENDING_PROVISIONING_QUEUE_NAME` | `provisioning-jobs` | Name of the work queue. Created automatically on first dispatch if it does not exist. |
+| `VENDING_PROVISIONING_DLQ_NAME` | `provisioning-jobs-deadletter` | Name of the dead-letter queue. Created automatically alongside the work queue. |
+| `VENDING_QUEUE_MAX_DELIVERY_COUNT` | `5` | Number of failed deliveries before the worker moves a message to the dead-letter queue. |
+| `VENDING_QUEUE_VISIBILITY_TIMEOUT` | `30` | Seconds a message remains invisible in the queue after a failed attempt before it reappears for retry. |
+| `VENDING_WORKER_SECRET` | `""` | Shared secret validated via the `x-worker-secret` / `x-replay-secret` header on `POST /worker/process-job` and `POST /webhook/replay`. Leave empty to disable header authentication (use only on private networks). |
+
+> **Soft dependency:** The `azure-storage-queue` package is required when `VENDING_RETRY_STRATEGY=queue`. It is wrapped in a `try/except` import — the service starts normally without it, but the `queue` strategy will raise a `RuntimeError` at first dispatch if the package is missing. Install it with `pip install azure-storage-queue`.
+
 ---
 
 ## Tag-based provisioning

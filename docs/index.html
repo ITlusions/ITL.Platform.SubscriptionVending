@@ -402,7 +402,7 @@
 <header class="hero">
   <div class="hero-badge">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    Event-driven &middot; Zero-touch provisioning
+    Event-driven &middot; Zero-touch provisioning &middot; Retry strategies
   </div>
   <h1>Subscription Vending<br>on Autopilot</h1>
   <p>A FastAPI microservice that automatically provisions new Azure subscriptions the moment they are created — no manual steps, no drift.</p>
@@ -451,6 +451,11 @@
         <div class="flow-node">
           <div class="flow-box highlight">POST /webhook/</div>
           <div class="flow-sub">ITL Vending Service</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-box">Dispatcher</div>
+          <div class="flow-sub">none / queue / dead_letter</div>
         </div>
         <div class="flow-arrow">→</div>
         <div class="flow-node">
@@ -537,6 +542,16 @@
 
       <div class="features-grid">
         <div class="feature-card">
+          <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
+          <div class="feature-title">Configurable retry strategies</div>
+          <div class="feature-desc">Choose between <code>none</code> (inline, always 200), <code>dead_letter</code> (500 on failure for Event Grid retry), or <code>queue</code> (async Storage Queue worker). Switch with a single env var.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/><path d="M12 8v4l3 3"/></svg></div>
+          <div class="feature-title">Manual replay endpoint</div>
+          <div class="feature-desc">Re-trigger provisioning for any subscription via <code>POST /webhook/replay</code> without a real Event Grid event. Idempotent, supports dry-run, and optionally protected by a shared secret.</div>
+        </div>
+        <div class="feature-card">
           <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
           <div class="feature-title">Event-driven trigger</div>
           <div class="feature-desc">Hooks into Azure Event Grid using <code>Microsoft.Resources.ResourceActionSuccess</code> — no polling, no cron jobs.</div>
@@ -588,6 +603,7 @@
         <span class="stack-tag">azure-mgmt-subscription</span>
         <span class="stack-tag">azure-mgmt-consumption</span>
         <span class="stack-tag">azure-eventgrid</span>
+        <span class="stack-tag">azure-storage-queue</span>
         <span class="stack-tag">httpx</span>
         <span class="stack-tag">hatchling</span>
         <span class="stack-tag">pytest + pytest-asyncio</span>

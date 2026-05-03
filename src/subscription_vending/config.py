@@ -65,3 +65,20 @@ class Settings(BaseSettings):
     # Event Grid
     event_grid_sas_key:          str = ""
     event_grid_topic_endpoint:   str = ""   # Outbound notification topic endpoint
+
+    # Retry strategy — choose one: "queue" | "dead_letter" | "none"
+    # queue:        Enqueue to Azure Storage Queue; a worker retries on failure.
+    # dead_letter:  Return non-200 to Event Grid on failure so it retries and dead-letters.
+    # none:         No retry. Fire-and-forget (current default behaviour).
+    retry_strategy:              str = "none"
+
+    # Storage Queue (used when retry_strategy = "queue")
+    # Uses Managed Identity by default when storage_account_name is set.
+    storage_account_name:        str = ""   # e.g. itlvendingsa
+    provisioning_queue_name:     str = "provisioning-jobs"
+    provisioning_dlq_name:       str = "provisioning-jobs-deadletter"
+    queue_max_delivery_count:    int = 5    # Move to DLQ after this many failures
+    queue_visibility_timeout:    int = 30   # Seconds before a failed message reappears
+
+    # Shared secret for /worker/process-job and /webhook/replay (leave empty to disable auth)
+    worker_secret:               str = ""
