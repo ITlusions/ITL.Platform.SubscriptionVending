@@ -28,6 +28,7 @@ from abc import ABC, abstractmethod
 import httpx
 
 from ..workflow import StepContext, WorkflowStep, register_step
+from .events import LifecycleEvent, on as _on_event
 
 
 class BaseStep(ABC):
@@ -38,9 +39,30 @@ class BaseStep(ABC):
     - ``logger``              -- per-class logger named after the subclass module
     - ``_build_payload(ctx)`` -- standard provisioning result dict shared by all steps
     - ``_http_post(...)``     -- POST JSON to a URL; errors recorded in ctx.result
+    - ``on(event)``           -- class-level decorator to subscribe to a lifecycle event
     - ``__call__``            -- wraps ``execute()`` with catch-all error recording
     - ``register()``          -- registers this instance with the workflow
     """
+
+    # Expose lifecycle events so subclasses don't need an extra import
+    Event = LifecycleEvent
+
+    @classmethod
+    def on(cls, event: LifecycleEvent):  # noqa: A003
+        """Subscribe a coroutine to a lifecycle event.
+
+        Can be used as a decorator on any async function::
+
+            class MyStep(BaseStep):
+                ...
+
+            @MyStep.on(MyStep.Event.PROVISIONING_SUCCEEDED)
+            async def _on_success(ctx) -> None:
+                ...
+
+        Or directly via the module-level ``on()`` from ``core.events``.
+        """
+        return _on_event(event)
 
     @property
     def logger(self) -> logging.Logger:

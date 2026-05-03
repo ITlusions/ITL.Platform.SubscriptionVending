@@ -12,6 +12,7 @@ from .azure.policy import assign_default_policies, attach_foundation_initiative
 from .azure.rbac import create_initial_rbac
 from .azure.tags import SubscriptionConfig, read_subscription_config
 from .config import Settings
+from .core.events import LifecycleEvent, emit
 
 logger = logging.getLogger(__name__)
 
@@ -247,14 +248,17 @@ async def run_provisioning_workflow(
     )
 
     # Custom steps — registered via @register_step, executed in dependency order
+    ctx = StepContext(
+        subscription_id=subscription_id,
+        subscription_name=subscription_name,
+        config=config,
+        settings=settings,
+        result=result,
+    )
+
+    await emit(LifecycleEvent.PROVISIONING_STARTED, ctx)
+
     if _EXTRA_STEPS:
-        ctx = StepContext(
-            subscription_id=subscription_id,
-            subscription_name=subscription_name,
-            config=config,
-            settings=settings,
-            result=result,
-        )
         try:
             ordered_steps = _toposort(_EXTRA_STEPS)
         except ValueError as exc:
@@ -268,6 +272,13 @@ async def run_provisioning_workflow(
             except Exception as exc:  # noqa: BLE001
                 result.errors.append(f"Custom step '{step.__qualname__}' failed: {exc}")
                 logger.exception("Custom workflow step %s failed", step.__qualname__)
+
+    # Lifecycle events — fire after all steps
+    await emit(LifecycleEvent.PROVISIONING_COMPLETED, ctx)
+    if result.success:
+        await emit(LifecycleEvent.PROVISIONING_SUCCEEDED, ctx)
+    else:
+        await emit(LifecycleEvent.PROVISIONING_FAILED, ctx)
 
     return result
 
