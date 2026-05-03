@@ -24,6 +24,7 @@ class SubscriptionConfig:
     budget_eur: int = 0
     owner_email: str = ""
     management_group_name: str = "ITL-Sandbox"
+    snow_ticket: str = ""
 
     @property
     def enforcement_mode(self) -> str:
@@ -87,6 +88,9 @@ async def read_subscription_config(
 
     if settings.tag_owner in tags:
         config.owner_email = tags[settings.tag_owner]
+
+    if settings.tag_snow_ticket in tags:
+        config.snow_ticket = tags[settings.tag_snow_ticket]
 
     logger.info(
         "[%s] Subscription config loaded: env=%s, mg=%s, aks=%s, budget=%d",

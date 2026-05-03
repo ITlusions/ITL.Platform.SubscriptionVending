@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     tag_aks:                str = "itl-aks"
     tag_budget:             str = "itl-budget"
     tag_owner:              str = "itl-owner"
+    tag_snow_ticket:        str = "itl-snow-ticket"
 
     # Default recipient for budget alerts when itl-owner tag is absent
     default_alert_email:    str = ""

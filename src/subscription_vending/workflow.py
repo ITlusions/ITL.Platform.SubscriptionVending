@@ -61,6 +61,49 @@ class _StepEntry:
 
 _EXTRA_STEPS: list[_StepEntry] = []
 
+# Gate steps run sequentially *before* all workflow steps.
+# If a gate step with stop_on_error=True records an error, the rest of the
+# gates AND all workflow steps are skipped.
+_GATE_STEPS: list[_StepEntry] = []
+
+
+def register_gate(
+    fn: WorkflowStep | None = None,
+    *,
+    stop_on_error: bool = True,
+) -> WorkflowStep | Callable[[WorkflowStep], WorkflowStep]:
+    """Register *fn* as a gate check that runs before any provisioning step.
+
+    Gate checks execute in registration order, before the topological step
+    graph.  They are ideal for pre-flight validation (e.g. ServiceNow ticket
+    checks) that must abort provisioning if they fail.
+
+    ``stop_on_error`` defaults to ``True`` for gate checks because failing a
+    gate should prevent the workflow from running.
+
+    Usage::
+
+        from subscription_vending.workflow import register_gate, StepContext
+
+        @register_gate
+        async def require_snow_ticket(ctx: StepContext) -> None:
+            if not ctx.config.snow_ticket:
+                ctx.result.errors.append("No ServiceNow ticket on subscription")
+
+    Class-based (via :class:`~core.base.BaseStep`)::
+
+        MyGateStep().register_gate()
+    """
+    def _register(f: WorkflowStep) -> WorkflowStep:
+        _GATE_STEPS.append(_StepEntry(fn=f, depends_on=[], stop_on_error=stop_on_error))
+        _name = getattr(f, "__qualname__", type(f).__qualname__)
+        logger.debug("Registered gate check: %s", _name)
+        return f
+
+    if fn is not None:
+        return _register(fn)
+    return _register
+
 
 def _toposort(entries: list[_StepEntry]) -> list[_StepEntry]:
     """Return step entries ordered so every dependency runs before its dependent.
@@ -342,7 +385,25 @@ async def run_provisioning_workflow(
 
     await emit(LifecycleEvent.PROVISIONING_STARTED, ctx)
 
-    if _EXTRA_STEPS:
+    # ── Gate checks (always run before workflow steps) ────────────────────────
+    _gate_aborted = False
+    for entry in _GATE_STEPS:
+        _step_name = getattr(entry.fn, "__qualname__", type(entry.fn).__qualname__)
+        errors_before = len(result.errors)
+        try:
+            logger.info("Running gate check: %s", _step_name)
+            await entry.fn(ctx)
+        except Exception as exc:  # noqa: BLE001
+            result.errors.append(f"Gate check '{_step_name}' failed: {exc}")
+            logger.exception("Gate check %s failed", _step_name)
+        if entry.stop_on_error and len(result.errors) > errors_before:
+            logger.warning(
+                "Provisioning aborted at gate '%s' (stop_on_error=True).", _step_name
+            )
+            _gate_aborted = True
+            break
+
+    if not _gate_aborted and _EXTRA_STEPS:
         try:
             ordered_steps = _toposort(_EXTRA_STEPS)
         except ValueError as exc:
