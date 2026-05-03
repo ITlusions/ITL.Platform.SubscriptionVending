@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Demo — ITL Subscription Vending</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --accent: #1f6feb;
+      --accent-glow: rgba(31, 111, 235, 0.15);
+      --accent2: #58a6ff;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --success: #3fb950;
+      --warning: #d29922;
+      --error: #f85149;
+      --tag-bg: #1f3347;
+      --tag-text: #58a6ff;
+      --radius: 8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+      font-size: 0.88em;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    /* ── Nav ──────────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(13,17,23,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px;
+    }
+    .nav-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 600; font-size: 0.9rem; color: var(--text);
+    }
+    .nav-links {
+      display: flex; gap: 1.5rem; list-style: none; font-size: 0.875rem;
+    }
+    .nav-links a { color: var(--muted); }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+
+    /* ── Hero ─────────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      padding: 4rem 2rem 3rem;
+      background: radial-gradient(ellipse at 50% 0%, rgba(31,111,235,0.12) 0%, transparent 70%);
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--tag-bg); color: var(--tag-text);
+      border: 1px solid rgba(88,166,255,0.3);
+      border-radius: 2rem; padding: 4px 14px;
+      font-size: 0.8rem; font-weight: 500; margin-bottom: 1.25rem;
+    }
+    .hero h1 {
+      font-size: clamp(1.75rem, 4vw, 2.75rem);
+      font-weight: 700; letter-spacing: -0.02em; line-height: 1.15;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #e6edf3 0%, #58a6ff 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: 1rem; color: var(--muted);
+      max-width: 560px; margin: 0 auto 2rem;
+    }
+
+    /* ── Layout ───────────────────────────────────────────── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+    .demo-layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 1.5rem;
+      padding: 2.5rem 0 4rem;
+      align-items: start;
+    }
+
+    /* ── Panel ────────────────────────────────────────────── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .panel-header {
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      font-size: 0.8rem; font-weight: 600;
+      color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .panel-body { padding: 1.25rem; }
+
+    /* ── Form ─────────────────────────────────────────────── */
+    .form-group { margin-bottom: 1rem; }
+    .form-group label {
+      display: block; font-size: 0.8rem; font-weight: 600;
+      color: var(--muted); margin-bottom: 0.35rem;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text);
+      padding: 8px 10px; font-size: 0.875rem;
+      font-family: inherit;
+      transition: border-color 0.15s;
+      outline: none;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .form-group input::placeholder { color: var(--muted); }
+
+    .tag-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .tag-row { display: flex; flex-direction: column; }
+    .tag-row label { font-size: 0.75rem; color: var(--muted); margin-bottom: 3px; }
+    .tag-row input {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text);
+      padding: 6px 8px; font-size: 0.8rem; font-family: monospace;
+      outline: none; transition: border-color 0.15s;
+    }
+    .tag-row input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .section-divider {
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted);
+      margin: 1.25rem 0 0.6rem;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-divider::after {
+      content: ""; flex: 1; height: 1px; background: var(--border);
+    }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: var(--radius);
+      font-size: 0.875rem; font-weight: 600; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      border: none; font-family: inherit; width: 100%;
+      justify-content: center; margin-top: 0.5rem;
+    }
+    .btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); margin-top: 0.5rem; }
+
+    /* ── Terminal / Output ────────────────────────────────── */
+    .output-panel { display: flex; flex-direction: column; gap: 1.25rem; }
+
+    .terminal {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .terminal-bar {
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .dot-red   { width: 12px; height: 12px; border-radius: 50%; background: #f85149; }
+    .dot-yellow{ width: 12px; height: 12px; border-radius: 50%; background: #d29922; }
+    .dot-green { width: 12px; height: 12px; border-radius: 50%; background: #3fb950; }
+    .terminal-title {
+      margin-left: auto; font-size: 0.75rem; color: var(--muted);
+      font-family: ui-monospace, monospace;
+    }
+    .terminal-body {
+      padding: 1rem 1.25rem;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 0.82rem; line-height: 1.75;
+      min-height: 120px;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    .terminal-body::-webkit-scrollbar { width: 6px; }
+    .terminal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .log-info    { color: var(--accent2); }
+    .log-success { color: var(--success); }
+    .log-warn    { color: var(--warning); }
+    .log-error   { color: var(--error); }
+    .log-muted   { color: var(--muted); }
+    .log-white   { color: var(--text); }
+    .log-step    { color: #e3b341; font-weight: 600; }
+
+    /* ── Steps tracker ────────────────────────────────────── */
+    .steps-tracker {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .steps-list { padding: 0.75rem; display: flex; flex-direction: column; gap: 4px; }
+    .step-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 6px;
+      font-size: 0.82rem;
+      transition: background 0.2s;
+    }
+    .step-item.pending  { color: var(--muted); }
+    .step-item.running  { background: rgba(31,111,235,0.1); color: var(--accent2); }
+    .step-item.success  { background: rgba(63,185,80,0.08); color: var(--success); }
+    .step-item.skipped  { color: var(--muted); opacity: 0.6; }
+    .step-item.failed   { background: rgba(248,81,73,0.08); color: var(--error); }
+    .step-icon { width: 18px; text-align: center; flex-shrink: 0; font-size: 0.85rem; }
+    .step-label { flex: 1; }
+    .step-time { font-size: 0.72rem; color: var(--muted); font-family: monospace; }
+
+    /* ── Result card ──────────────────────────────────────── */
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: none;
+    }
+    .result-card.visible { display: block; }
+    .result-header {
+      padding: 1rem 1.25rem;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .result-header.success { background: rgba(63,185,80,0.08); }
+    .result-header.partial { background: rgba(210,153,34,0.08); }
+    .result-title { font-weight: 600; font-size: 0.95rem; }
+    .result-body { padding: 1rem 1.25rem; }
+    .result-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 5px 0; border-bottom: 1px solid var(--border);
+      font-size: 0.83rem;
+    }
+    .result-row:last-child { border-bottom: none; }
+    .result-key { color: var(--muted); }
+    .result-val { color: var(--text); font-family: monospace; font-size: 0.8rem; max-width: 60%; text-align: right; word-break: break-all; }
+    .result-val.success { color: var(--success); }
+    .result-val.error   { color: var(--error); }
+
+    /* ── Event payload ────────────────────────────────────── */
+    .json-block {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      font-family: ui-monospace, monospace;
+      font-size: 0.78rem; line-height: 1.65;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--muted);
+    }
+    .json-key   { color: #79c0ff; }
+    .json-str   { color: #a5d6ff; }
+    .json-num   { color: #f2cc60; }
+    .json-bool  { color: #ff7b72; }
+
+    /* ── Spinner ──────────────────────────────────────────── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block; width: 12px; height: 12px;
+      border: 2px solid var(--border); border-top-color: var(--accent2);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+
+    /* ── Idle prompt ──────────────────────────────────────── */
+    .idle-prompt {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 3rem 1rem;
+      gap: 0.75rem; color: var(--muted); text-align: center;
+      font-size: 0.85rem;
+    }
+    .idle-prompt svg { opacity: 0.3; }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem; text-align: center;
+      font-size: 0.82rem; color: var(--muted);
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 768px) {
+      .demo-layout { grid-template-columns: 1fr; }
+      .tag-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+    ITL Subscription Vending
+  </div>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="architecture">Architecture</a></li>
+    <li><a href="provisioning-workflow">Workflow</a></li>
+    <li><a href="https://github.com/ITlusions/ITL.Platform.SubscriptionVending" target="_blank" rel="noopener">GitHub</a></li>
+  </ul>
+</nav>
+
+<header class="hero">
+  <div class="hero-badge">
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+    Interactive Demo
+  </div>
+  <h1>See Subscription Vending in action</h1>
+  <p>Configure a subscription below, fire the Event Grid event, and watch the 7-step provisioning workflow run in real time.</p>
+</header>
+
+<main>
+  <div class="container">
+    <div class="demo-layout">
+
+      <!-- ── Left: config panel ── -->
+      <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+        <div class="panel">
+          <div class="panel-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            Subscription
+          </div>
+          <div class="panel-body">
+            <div class="form-group">
+              <label>Subscription name</label>
+              <input id="sub-name" type="text" value="myteam-production" placeholder="myteam-production" />
+            </div>
+            <div class="form-group">
+              <label>Subscription ID</label>
+              <input id="sub-id" type="text" value="" placeholder="auto-generate" />
+            </div>
+            <div class="form-group">
+              <label>Management group (override)</label>
+              <input id="mg-override" type="text" value="" placeholder="derived from itl-environment tag" />
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            Subscription Tags
+          </div>
+          <div class="panel-body">
+            <div class="tag-grid">
+              <div class="tag-row">
+                <label>itl-environment</label>
+                <input id="tag-env" type="text" value="production" />
+              </div>
+              <div class="tag-row">
+                <label>itl-budget (EUR)</label>
+                <input id="tag-budget" type="text" value="1000" />
+              </div>
+              <div class="tag-row">
+                <label>itl-owner</label>
+                <input id="tag-owner" type="text" value="platform@itlusions.com" />
+              </div>
+              <div class="tag-row">
+                <label>itl-aks</label>
+                <input id="tag-aks" type="text" value="false" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Scenario
+          </div>
+          <div class="panel-body">
+            <div class="form-group">
+              <label>Preset scenario</label>
+              <select id="scenario">
+                <option value="happy">Happy path — all steps succeed</option>
+                <option value="no-budget">No budget tag — step 5 skipped</option>
+                <option value="auth-fail">Authorization service down — step 2 fails</option>
+                <option value="rbac-partial">RBAC partial failure — 1 of 4 fails</option>
+                <option value="all-fail">Worst case — steps 1–4 fail</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="run-btn" onclick="runDemo()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Fire Event &amp; Run Workflow
+            </button>
+            <button class="btn btn-secondary" onclick="resetDemo()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+              Reset
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── Right: output panel ── -->
+      <div class="output-panel">
+
+        <!-- Event payload -->
+        <div class="panel">
+          <div class="panel-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/></svg>
+            Inbound Event Grid Event
+          </div>
+          <div class="panel-body" style="padding:0.75rem">
+            <div class="json-block" id="event-payload">
+<span class="log-muted">// Fill in the form and click "Fire Event" to see the Event Grid payload</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Steps tracker -->
+        <div class="steps-tracker">
+          <div class="panel-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Provisioning Steps
+          </div>
+          <div class="steps-list" id="steps-list">
+            <div class="idle-prompt">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Click "Fire Event" to start the provisioning workflow</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Workflow log -->
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="dot-red"></div><div class="dot-yellow"></div><div class="dot-green"></div>
+            <span class="terminal-title">vending-service — provisioning log</span>
+          </div>
+          <div class="terminal-body" id="terminal-body">
+            <span class="log-muted">Waiting for event...</span>
+          </div>
+        </div>
+
+        <!-- Result -->
+        <div class="result-card" id="result-card">
+          <div class="result-header" id="result-header">
+            <span id="result-icon"></span>
+            <span class="result-title" id="result-title"></span>
+          </div>
+          <div class="result-body" id="result-body"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <p>
+    &copy; <span id="yr"></span>
+    <a href="https://github.com/ITlusions" target="_blank" rel="noopener">ITLusions</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/ITlusions/ITL.Platform.SubscriptionVending" target="_blank" rel="noopener">GitHub</a>
+    &nbsp;·&nbsp;
+    MIT License
+  </p>
+</footer>
+
+<script>
+document.getElementById("yr").textContent = new Date().getFullYear();
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function uuid() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+function pad(n) { return String(n).padStart(2, "0"); }
+
+function timestamp() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T` +
+         `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}Z`;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── JSON syntax highlight ─────────────────────────────────────────────────────
+
+function highlightJson(obj) {
+  const raw = JSON.stringify(obj, null, 2);
+  return raw
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?)/g, m => {
+      if (/:$/.test(m)) return `<span class="json-key">${m}</span>`;
+      return `<span class="json-str">${m}</span>`;
+    })
+    .replace(/\b(true|false|null)\b/g, m => `<span class="json-bool">${m}</span>`)
+    .replace(/\b(-?\d+\.?\d*)\b/g, m => `<span class="json-num">${m}</span>`);
+}
+
+// ── Step definitions ──────────────────────────────────────────────────────────
+
+const STEP_DEFS = [
+  { id: 0, label: "Read subscription tags",        icon: "🏷️" },
+  { id: 1, label: "Move to management group",      icon: "📁" },
+  { id: 2, label: "Attach Foundation Initiative",  icon: "📋" },
+  { id: 3, label: "Create RBAC role assignments",  icon: "🔑" },
+  { id: 4, label: "Assign default policies",       icon: "🛡️" },
+  { id: 5, label: "Create budget alert",           icon: "💰" },
+  { id: 6, label: "Publish outbound event",        icon: "📡" },
+];
+
+// ── Scenario outcomes ─────────────────────────────────────────────────────────
+
+function getOutcomes(scenario, hasBudget) {
+  const ok      = () => ({ result: "success", delay: 350 + Math.random() * 300 });
+  const fail    = msg => ({ result: "failed",  delay: 400 + Math.random() * 200, error: msg });
+  const skipped = msg => ({ result: "skipped", delay: 80, reason: msg });
+
+  const base = {
+    happy:       [ok(), ok(), ok(), ok(), ok(), hasBudget ? ok() : skipped("itl-budget tag not set"), ok()],
+    "no-budget": [ok(), ok(), ok(), ok(), ok(), skipped("itl-budget tag not set"), ok()],
+    "auth-fail": [ok(), ok(), fail("503 Service Unavailable — authorization service down"), ok(), ok(), hasBudget ? ok() : skipped("itl-budget tag not set"), ok()],
+    "rbac-partial": [ok(), ok(), ok(), { result: "partial", delay: 500, note: "3/4 succeeded — ops-group assignment failed (403 Forbidden)" }, ok(), hasBudget ? ok() : skipped("itl-budget tag not set"), ok()],
+    "all-fail": [ok(), fail("ResourceNotFound — management group 'ITL-Production' does not exist"), fail("503 — authorization service unreachable"), fail("AuthorizationFailed — insufficient permissions"), fail("PolicyAssignmentFailed — scope locked"), hasBudget ? fail("ConsumptionQuotaExceeded") : skipped("itl-budget tag not set"), ok()],
+  };
+  return base[scenario] || base.happy;
+}
+
+// ── DOM helpers ───────────────────────────────────────────────────────────────
+
+function log(cls, text) {
+  const el = document.getElementById("terminal-body");
+  el.innerHTML += `<div class="${cls}">${text}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderSteps(states) {
+  const list = document.getElementById("steps-list");
+  list.innerHTML = STEP_DEFS.map((s, i) => {
+    const st = states[i] || { status: "pending" };
+    let icon = "○";
+    if (st.status === "running")  icon = '<span class="spinner"></span>';
+    if (st.status === "success")  icon = "✓";
+    if (st.status === "partial")  icon = "⚠";
+    if (st.status === "skipped")  icon = "–";
+    if (st.status === "failed")   icon = "✗";
+    return `<div class="step-item ${st.status || "pending"}">
+      <span class="step-icon">${icon}</span>
+      <span class="step-label">${s.icon} ${s.label}</span>
+      ${st.ms ? `<span class="step-time">${st.ms}ms</span>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function showResult(subId, mgName, initiative, rbacRoles, errors, totalMs) {
+  const card    = document.getElementById("result-card");
+  const header  = document.getElementById("result-header");
+  const title   = document.getElementById("result-title");
+  const icon    = document.getElementById("result-icon");
+  const body    = document.getElementById("result-body");
+  const success = errors.length === 0;
+  const partial = !success;
+
+  card.classList.add("visible");
+  header.className = `result-header ${success ? "success" : "partial"}`;
+  icon.textContent = success ? "✅" : "⚠️";
+  title.textContent = success
+    ? "Provisioning completed successfully"
+    : `Provisioning completed with ${errors.length} error${errors.length > 1 ? "s" : ""}`;
+
+  body.innerHTML = [
+    ["subscription_id",   subId,                               ""],
+    ["management_group",  mgName,                              ""],
+    ["initiative_id",     initiative || "(not attached)",      initiative ? "" : "error"],
+    ["rbac_roles",        rbacRoles.length ? `${rbacRoles.length} assignment(s)` : "0 (failed)", rbacRoles.length ? "success" : "error"],
+    ["errors",            errors.length ? errors.join("; ") : "none", errors.length ? "error" : "success"],
+    ["success",           String(success),                     success ? "success" : "error"],
+    ["total_duration",    `${totalMs}ms`,                      ""],
+  ].map(([k, v, cls]) =>
+    `<div class="result-row">
+       <span class="result-key">${k}</span>
+       <span class="result-val ${cls}">${v}</span>
+     </div>`
+  ).join("");
+}
+
+// ── Main demo runner ──────────────────────────────────────────────────────────
+
+let running = false;
+
+async function runDemo() {
+  if (running) return;
+  running = true;
+  document.getElementById("run-btn").disabled = true;
+
+  // Collect inputs
+  const subName  = document.getElementById("sub-name").value.trim()  || "my-subscription";
+  const subId    = document.getElementById("sub-id").value.trim()    || uuid();
+  const mgOver   = document.getElementById("mg-override").value.trim();
+  const tagEnv   = document.getElementById("tag-env").value.trim()   || "sandbox";
+  const tagBudget= document.getElementById("tag-budget").value.trim();
+  const tagOwner = document.getElementById("tag-owner").value.trim();
+  const tagAks   = document.getElementById("tag-aks").value.trim();
+  const scenario = document.getElementById("scenario").value;
+  const hasBudget= !!tagBudget && parseInt(tagBudget) > 0;
+
+  // MG mapping
+  const mgMap = {
+    production: "ITL-Production", staging: "ITL-Staging",
+    development: "ITL-Development", sandbox: "ITL-Sandbox",
+  };
+  const resolvedMg = mgOver || mgMap[tagEnv.toLowerCase()] || "ITL-Sandbox";
+
+  // Build event payload
+  const event = [{
+    id: `evt-${uuid().slice(0,8)}`,
+    eventType: "Microsoft.Resources.ResourceActionSuccess",
+    subject: `/subscriptions/${subId}/resourceGroups/rg`,
+    dataVersion: "1.0",
+    eventTime: timestamp(),
+    data: {
+      operationName: "Microsoft.Subscription/aliases/write",
+      resourceUri: `/subscriptions/${subId}`,
+      displayName: subName,
+      managementGroupId: mgOver || "",
+    },
+  }];
+
+  // Render event payload
+  document.getElementById("event-payload").innerHTML = highlightJson(event);
+
+  // Clear terminal & result
+  document.getElementById("terminal-body").innerHTML = "";
+  document.getElementById("result-card").classList.remove("visible");
+
+  // Init step states
+  const states = STEP_DEFS.map(() => ({ status: "pending" }));
+  renderSteps(states);
+
+  // Get outcomes
+  const outcomes = getOutcomes(scenario, hasBudget);
+
+  log("log-info", `[${timestamp()}] POST /webhook/ received`);
+  log("log-muted", `  aeg-event-type: Notification`);
+  log("log-muted", `  subscription-id: ${subId}`);
+  log("log-muted", `  event-id: ${event[0].id}`);
+  await sleep(300);
+  log("log-info", `[${timestamp()}] SAS key validation: OK`);
+  log("log-info", `[${timestamp()}] Event type matched: Microsoft.Subscription/aliases/write`);
+  log("log-info", `[${timestamp()}] Starting provisioning workflow for ${subName} (${subId})`);
+  await sleep(200);
+
+  const errors = [];
+  const rbacRoles = [];
+  let initiative = "";
+  const startAll = Date.now();
+
+  for (let i = 0; i < STEP_DEFS.length; i++) {
+    const step = STEP_DEFS[i];
+    const outcome = outcomes[i];
+    const tStart = Date.now();
+
+    states[i] = { status: "running" };
+    renderSteps(states);
+    log("log-step", `\n[Step ${i}] ${step.label}...`);
+
+    await sleep(outcome.delay);
+
+    const ms = Date.now() - tStart;
+
+    if (outcome.result === "success") {
+      states[i] = { status: "success", ms };
+      renderSteps(states);
+
+      if (i === 0) {
+        log("log-muted", `  itl-environment = ${tagEnv}`);
+        if (tagBudget) log("log-muted", `  itl-budget      = ${tagBudget}`);
+        if (tagOwner)  log("log-muted", `  itl-owner       = ${tagOwner}`);
+        if (tagAks)    log("log-muted", `  itl-aks         = ${tagAks}`);
+        log("log-muted", `  → target MG: ${resolvedMg}`);
+        log("log-muted", `  → enforcement: ${tagEnv === "production" ? "Default" : "DoNotEnforce"}`);
+      }
+      if (i === 1) log("log-muted", `  /subscriptions/${subId} → ${resolvedMg}`);
+      if (i === 2) { initiative = `init-${uuid().slice(0,6)}`; log("log-muted", `  initiative_id: ${initiative}`); }
+      if (i === 3) {
+        const roles = ["Owner (platform-spn)", "Contributor (ops-group)", "Security Reader (security-group)", "Cost Mgmt Reader (finops-group)"];
+        roles.forEach(r => { rbacRoles.push(uuid()); log("log-muted", `  + ${r}`); });
+      }
+      if (i === 4) log("log-muted", `  (no default policies configured — skipped silently)`);
+      if (i === 5) { log("log-muted", `  amount: ${tagBudget} EUR/month`); log("log-muted", `  contact: ${tagOwner || "VENDING_DEFAULT_ALERT_EMAIL"}`); log("log-muted", `  alerts at 80% and 100%`); }
+      if (i === 6) log("log-muted", `  ITL.SubscriptionVending.SubscriptionProvisioned → topic`);
+      log("log-success", `  ✓ completed in ${ms}ms`);
+
+    } else if (outcome.result === "skipped") {
+      states[i] = { status: "skipped", ms };
+      renderSteps(states);
+      log("log-muted", `  skipped — ${outcome.reason}`);
+
+    } else if (outcome.result === "partial") {
+      states[i] = { status: "partial", ms };
+      renderSteps(states);
+      log("log-warn", `  ⚠ partial — ${outcome.note}`);
+      rbacRoles.push(uuid(), uuid(), uuid());
+      errors.push(`RBAC partial: ${outcome.note}`);
+
+    } else {
+      states[i] = { status: "failed", ms };
+      renderSteps(states);
+      const err = `Step ${i} (${step.label}) failed: ${outcome.error}`;
+      errors.push(err);
+      log("log-error", `  ✗ ${outcome.error}`);
+      log("log-warn", `  → error recorded, continuing to next step...`);
+    }
+  }
+
+  const totalMs = Date.now() - startAll;
+
+  log("log-muted", "");
+  log("log-info", `[${timestamp()}] Workflow complete — returning 200 OK to Event Grid`);
+  log(errors.length ? "log-warn" : "log-success",
+    `  success: ${errors.length === 0} | errors: ${errors.length} | duration: ${totalMs}ms`);
+
+  renderSteps(states);
+  showResult(subId, resolvedMg, initiative, rbacRoles, errors, totalMs);
+
+  running = false;
+  document.getElementById("run-btn").disabled = false;
+}
+
+function resetDemo() {
+  document.getElementById("terminal-body").innerHTML = '<span class="log-muted">Waiting for event...</span>';
+  document.getElementById("event-payload").innerHTML = '<span class="log-muted">// Fill in the form and click "Fire Event" to see the Event Grid payload</span>';
+  document.getElementById("result-card").classList.remove("visible");
+  document.getElementById("steps-list").innerHTML = `
+    <div class="idle-prompt">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <span>Click "Fire Event" to start the provisioning workflow</span>
+    </div>`;
+  document.getElementById("sub-id").value = "";
+  running = false;
+  document.getElementById("run-btn").disabled = false;
+}
+</script>
+</body>
+</html>
