@@ -3,16 +3,66 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
-from .config import Settings
 from .azure.management_groups import move_subscription_to_management_group
-from .azure.rbac import create_initial_rbac
-from .azure.policy import assign_default_policies, attach_foundation_initiative
-from .azure.tags import read_subscription_config
 from .azure.notifications import publish_provisioned_event
+from .azure.policy import assign_default_policies, attach_foundation_initiative
+from .azure.rbac import create_initial_rbac
+from .azure.tags import SubscriptionConfig, read_subscription_config
+from .config import Settings
 
 logger = logging.getLogger(__name__)
+
+
+# ── Custom step registry ──────────────────────────────────────────────────────
+
+@dataclass
+class StepContext:
+    """Passed to every custom workflow step.
+
+    Attributes:
+        subscription_id:   The newly created Azure subscription ID.
+        subscription_name: Display name of the subscription.
+        config:            Tag-derived provisioning config (environment, budget, etc.).
+        settings:          Service settings / env-var config.
+        result:            Mutable result object — append to ``result.errors`` on failure.
+    """
+
+    subscription_id:   str
+    subscription_name: str
+    config:            SubscriptionConfig
+    settings:          Settings
+    result:            "ProvisioningResult"
+
+
+# Type alias for a custom step coroutine.
+WorkflowStep = Callable[[StepContext], Awaitable[None]]
+
+_EXTRA_STEPS: list[WorkflowStep] = []
+
+
+def register_step(fn: WorkflowStep) -> WorkflowStep:
+    """Register *fn* as an extra provisioning step.
+
+    Decorated steps run **after** all built-in steps (0–6) in the order they
+    are registered. A raised exception is caught, recorded in
+    ``ctx.result.errors``, and never prevents subsequent steps from running.
+
+    Usage::
+
+        from subscription_vending.workflow import register_step, StepContext
+
+        @register_step
+        async def my_step(ctx: StepContext) -> None:
+            if ctx.config.environment != "production":
+                return
+            # ... your logic here ...
+    """
+    _EXTRA_STEPS.append(fn)
+    logger.debug("Registered custom workflow step: %s", fn.__qualname__)
+    return fn
 
 
 @dataclass
@@ -133,6 +183,23 @@ async def run_provisioning_workflow(
         subscription_name=subscription_name,
         settings=settings,
     )
+
+    # Custom steps — registered via @register_step
+    if _EXTRA_STEPS:
+        ctx = StepContext(
+            subscription_id=subscription_id,
+            subscription_name=subscription_name,
+            config=config,
+            settings=settings,
+            result=result,
+        )
+        for step in _EXTRA_STEPS:
+            try:
+                logger.info("Running custom workflow step: %s", step.__qualname__)
+                await step(ctx)
+            except Exception as exc:  # noqa: BLE001
+                result.errors.append(f"Custom step '{step.__qualname__}' failed: {exc}")
+                logger.exception("Custom workflow step %s failed", step.__qualname__)
 
     return result
 
