@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Automated Demo — ITL Subscription Vending</title>
+  <title>Automated Demo � ITL Subscription Vending</title>
   <style>
     :root {
       --bg:          #0d1117;
@@ -263,7 +263,7 @@
     <li><a href="architecture">Architecture</a></li>
     <li><a href="provisioning-workflow">Workflow</a></li>
     <li><a href="api">API</a></li>
-    <li><a href="demo.html" style="color:var(--text)">Demo</a></li>
+    <li><a href="demo" style="color:var(--text)">Demo</a></li>
     <li><a href="https://github.com/ITlusions/ITL.Platform.SubscriptionVending" target="_blank" rel="noopener">GitHub</a></li>
   </ul>
 </nav>
@@ -273,7 +273,7 @@
     <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
     Automated Walkthrough
   </div>
-  <h1>Subscription Vending — Live Demo</h1>
+  <h1>Subscription Vending � Live Demo</h1>
   <p>Watch the full end-to-end provisioning workflow run automatically across five real-world scenarios. The inbound Event Grid webhook, all seven provisioning steps, and the HTTP response are shown in real time.</p>
   <div class="hero-controls">
     <div class="status-badge">
@@ -407,7 +407,7 @@
 <script>
 document.getElementById("yr").textContent = new Date().getFullYear();
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// -- Helpers -------------------------------------------------------------------
 
 function uuid() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -447,7 +447,7 @@ function highlightJson(obj) {
   }).join("\n");
 }
 
-// ── Step definitions ──────────────────────────────────────────────────────────
+// -- Step definitions ----------------------------------------------------------
 
 const STEP_DEFS = [
   { id: 0, label: "Read subscription tags"        },
@@ -459,7 +459,7 @@ const STEP_DEFS = [
   { id: 6, label: "Publish outbound event"        },
 ];
 
-// ── Scenarios ─────────────────────────────────────────────────────────────────
+// -- Scenarios -----------------------------------------------------------------
 
 const SCENARIOS = [
   {
@@ -470,25 +470,25 @@ const SCENARIOS = [
   },
   {
     label:    "No budget tag",
-    desc:     "Step 5 skipped — budget alert omitted",
+    desc:     "Step 5 skipped � budget alert omitted",
     sub:      { name: "dev-sandbox-01",       env: "sandbox",     budget: "",     owner: "devteam@itlusions.com",  aks: "false" },
     scenario: "no-budget",
   },
   {
     label:    "Authorization service down",
-    desc:     "Step 2 fails — 503 from auth endpoint",
+    desc:     "Step 2 fails � 503 from auth endpoint",
     sub:      { name: "logistics-staging",    env: "staging",     budget: "500",  owner: "ops@itlusions.com",      aks: "false" },
     scenario: "auth-fail",
   },
   {
     label:    "RBAC partial failure",
-    desc:     "Step 3 partial — 3 of 4 assignments applied",
+    desc:     "Step 3 partial � 3 of 4 assignments applied",
     sub:      { name: "platform-development", env: "development", budget: "1000", owner: "platform@itlusions.com", aks: "true"  },
     scenario: "rbac-partial",
   },
   {
     label:    "Cascading failures",
-    desc:     "Steps 1–5 fail — worst-case scenario",
+    desc:     "Steps 1�5 fail � worst-case scenario",
     sub:      { name: "legacy-production",    env: "production",  budget: "5000", owner: "legacy@itlusions.com",   aks: "false" },
     scenario: "all-fail",
   },
@@ -503,19 +503,19 @@ function getOutcomes(scenario, hasBudget) {
   return ({
     happy:         [ok(), ok(), ok(), ok(), ok(), bud, ok()],
     "no-budget":   [ok(), ok(), ok(), ok(), ok(), skip("itl-budget tag not set"), ok()],
-    "auth-fail":   [ok(), ok(), fail("503 Service Unavailable — authorization service unreachable"), ok(), ok(), bud, ok()],
-    "rbac-partial":[ok(), ok(), ok(), { result: "partial", delay: 460, note: "3/4 succeeded — ops-group assignment failed (403 Forbidden)" }, ok(), bud, ok()],
+    "auth-fail":   [ok(), ok(), fail("503 Service Unavailable � authorization service unreachable"), ok(), ok(), bud, ok()],
+    "rbac-partial":[ok(), ok(), ok(), { result: "partial", delay: 460, note: "3/4 succeeded � ops-group assignment failed (403 Forbidden)" }, ok(), bud, ok()],
     "all-fail":    [ok(),
-      fail("ResourceNotFound — management group 'ITL-Production' does not exist"),
-      fail("503 — authorization service unreachable"),
-      fail("AuthorizationFailed — insufficient permissions"),
-      fail("PolicyAssignmentFailed — scope locked"),
-      hasBudget ? fail("ConsumptionQuotaExceeded — budget limit reached") : skip("itl-budget tag not set"),
+      fail("ResourceNotFound � management group 'ITL-Production' does not exist"),
+      fail("503 � authorization service unreachable"),
+      fail("AuthorizationFailed � insufficient permissions"),
+      fail("PolicyAssignmentFailed � scope locked"),
+      hasBudget ? fail("ConsumptionQuotaExceeded � budget limit reached") : skip("itl-budget tag not set"),
       ok()],
   })[scenario] || [ok(),ok(),ok(),ok(),ok(),ok(),ok()];
 }
 
-// ── DOM helpers ───────────────────────────────────────────────────────────────
+// -- DOM helpers ---------------------------------------------------------------
 
 function tlog(cls, text) {
   const el = document.getElementById("terminal-body");
@@ -632,8 +632,8 @@ function showResult(subId, mg, initiative, rbacCount, errors, totalMs) {
     ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
     : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
   title.textContent = success
-    ? "Provisioning completed — all steps succeeded"
-    : `Provisioning completed — ${errors.length} error${errors.length > 1 ? "s" : ""} recorded`;
+    ? "Provisioning completed � all steps succeeded"
+    : `Provisioning completed � ${errors.length} error${errors.length > 1 ? "s" : ""} recorded`;
 
   body.innerHTML = [
     ["subscription_id",   subId,                                 ""],
@@ -651,7 +651,7 @@ function showResult(subId, mg, initiative, rbacCount, errors, totalMs) {
   ).join("");
 }
 
-// ── Auto-demo engine ──────────────────────────────────────────────────────────
+// -- Auto-demo engine ----------------------------------------------------------
 
 const COUNTDOWN_MS = 4500;
 let adPlaying      = false;
@@ -695,7 +695,7 @@ async function adRunScenario(def, idx) {
   renderSteps(states);
   renderScenarioList(idx, adDoneMap);
 
-  // ── Receive webhook ───────────────────────────────────────
+  // -- Receive webhook ---------------------------------------
   tlog("l-muted", `${ts()} \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
   tlog("l-info",  `${ts()} POST /webhook/ &mdash; Event Grid notification received`);
   tlog("l-muted", `  aeg-event-type       Notification`);
@@ -724,7 +724,7 @@ async function adRunScenario(def, idx) {
   tlog("l-muted", `  sub_name             ${sub.name}`);
   tlog("l-muted", `  scenario             ${def.label}`);
 
-  // ── Steps ─────────────────────────────────────────────────
+  // -- Steps -------------------------------------------------
   const outcomes  = getOutcomes(def.scenario, hasBudget);
   const errors    = [];
   let   rbacCount = 0;
@@ -927,7 +927,7 @@ function adRestart() {
   setTimeout(() => { adAbort = false; }, 80);
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// -- Init ----------------------------------------------------------------------
 renderScenarioList(-1, {});
 </script>
 </body>
