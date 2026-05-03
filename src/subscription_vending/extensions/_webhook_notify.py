@@ -15,8 +15,6 @@ from __future__ import annotations
 
 import os
 
-import httpx
-
 from ..workflow import StepContext
 from ..core.base import BaseStep
 
@@ -33,29 +31,8 @@ class WebhookNotifyStep(BaseStep):
         self.timeout = timeout
 
     async def execute(self, ctx: StepContext) -> None:
-        if not self.url:
-            logger.debug("WebhookNotifyStep: URL not configured, skipping")
-            return
-
-        headers: dict[str, str] = {"Content-Type": "application/json"}
-        if self.secret:
-            headers["X-Webhook-Secret"] = self.secret
-
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    self.url, json=self._build_payload(ctx), headers=headers
-                )
-                response.raise_for_status()
-                self.logger.info("WebhookNotifyStep: POST %s -> %s", self.url, response.status_code)
-        except httpx.HTTPStatusError as exc:
-            ctx.result.errors.append(
-                f"WebhookNotifyStep: server returned {exc.response.status_code}"
-            )
-            self.logger.error("WebhookNotifyStep: HTTP error %s", exc)
-        except httpx.RequestError as exc:
-            ctx.result.errors.append(f"WebhookNotifyStep: request failed - {exc}")
-            self.logger.error("WebhookNotifyStep: request error %s", exc)
+        headers = {"X-Webhook-Secret": self.secret} if self.secret else {}
+        await self._http_post(ctx, self.url, headers=headers, timeout=self.timeout)
 
 
 # Auto-register when this module is imported.

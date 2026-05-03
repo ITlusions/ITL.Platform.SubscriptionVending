@@ -15,8 +15,6 @@ from __future__ import annotations
 
 import os
 
-import httpx
-
 from ..workflow import StepContext
 from ..core.base import BaseStep
 
@@ -30,29 +28,8 @@ class ApiNotifyStep(BaseStep):
         self.timeout      = timeout
 
     async def execute(self, ctx: StepContext) -> None:
-        if not self.url:
-            self.logger.debug("ApiNotifyStep: URL not configured, skipping")
-            return
-
-        headers: dict[str, str] = {"Content-Type": "application/json"}
-        if self.bearer_token:
-            headers["Authorization"] = f"Bearer {self.bearer_token}"
-
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    self.url, json=self._build_payload(ctx), headers=headers
-                )
-                response.raise_for_status()
-                self.logger.info("ApiNotifyStep: POST %s -> %s", self.url, response.status_code)
-        except httpx.HTTPStatusError as exc:
-            ctx.result.errors.append(
-                f"ApiNotifyStep: server returned {exc.response.status_code}"
-            )
-            self.logger.error("ApiNotifyStep: HTTP error %s", exc)
-        except httpx.RequestError as exc:
-            ctx.result.errors.append(f"ApiNotifyStep: request failed - {exc}")
-            self.logger.error("ApiNotifyStep: request error %s", exc)
+        headers = {"Authorization": f"Bearer {self.bearer_token}"} if self.bearer_token else {}
+        await self._http_post(ctx, self.url, headers=headers, timeout=self.timeout)
 
 
 # Auto-register when this module is imported.

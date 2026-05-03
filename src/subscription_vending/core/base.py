@@ -25,6 +25,8 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 
+import httpx
+
 from ..workflow import StepContext, WorkflowStep, register_step
 
 
@@ -35,6 +37,7 @@ class BaseStep(ABC):
 
     - ``logger``              -- per-class logger named after the subclass module
     - ``_build_payload(ctx)`` -- standard provisioning result dict shared by all steps
+    - ``_http_post(...)``     -- POST JSON to a URL; errors recorded in ctx.result
     - ``__call__``            -- wraps ``execute()`` with catch-all error recording
     - ``register()``          -- registers this instance with the workflow
     """
@@ -55,6 +58,42 @@ class BaseStep(ABC):
             "errors":            list(ctx.result.errors),  # snapshot at call time
             "success":           len(ctx.result.errors) == 0,
         }
+
+    async def _http_post(
+        self,
+        ctx: StepContext,
+        url: str,
+        headers: dict[str, str] | None = None,
+        timeout: float = 10.0,
+    ) -> bool:
+        """POST ``_build_payload(ctx)`` as JSON to *url*.
+
+        Returns ``True`` on success.  HTTP and network errors are caught,
+        recorded in ``ctx.result.errors``, and ``False`` is returned.
+        """
+        if not url:
+            self.logger.debug("%s: URL not configured, skipping", type(self).__name__)
+            return False
+
+        merged: dict[str, str] = {"Content-Type": "application/json"}
+        if headers:
+            merged.update(headers)
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(url, json=self._build_payload(ctx), headers=merged)
+                response.raise_for_status()
+                self.logger.info("%s: POST %s -> %s", type(self).__name__, url, response.status_code)
+                return True
+        except httpx.HTTPStatusError as exc:
+            ctx.result.errors.append(
+                f"{type(self).__name__}: server returned {exc.response.status_code}"
+            )
+            self.logger.error("%s: HTTP error %s", type(self).__name__, exc)
+        except httpx.RequestError as exc:
+            ctx.result.errors.append(f"{type(self).__name__}: request failed - {exc}")
+            self.logger.error("%s: request error %s", type(self).__name__, exc)
+        return False
 
     @abstractmethod
     async def execute(self, ctx: StepContext) -> None:
