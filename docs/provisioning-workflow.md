@@ -5,7 +5,14 @@ title: Provisioning Workflow
 
 # Provisioning Workflow
 
-When the service receives a `Microsoft.Resources.ResourceActionSuccess` event for a `Microsoft.Subscription/aliases/write` operation, it executes the following workflow for the new subscription. Each step is independent — a failure in one step is logged and recorded in `result.errors`, but does not stop subsequent steps.
+When the service receives a `Microsoft.Resources.ResourceActionSuccess` event for a `Microsoft.Subscription/aliases/write` operation, it executes the following workflow for the new subscription.
+
+The workflow has two phases:
+
+1. **Gate checks** — pre-flight validations that run before any Azure mutation. A failing gate with `stop_on_error=True` aborts provisioning entirely.
+2. **Provisioning steps** — the actual Azure operations, run in topological order.
+
+A failure in a provisioning step is logged and recorded in `result.errors` by default, but does not stop subsequent steps (unless `stop_on_error=True` is set on that step).
 
 All steps — built-in (Steps 1–6) **and** custom steps from `extensions/` — run through a shared topological sort driven by `depends_on` declarations. This means you can insert a custom step between any two built-in steps by referencing the relevant step constant:
 
@@ -32,7 +39,61 @@ All constants are also re-exported from `subscription_vending` directly.
 
 ---
 
-## Step 0 — Read subscription tags
+## Gate checks
+
+Gate checks run **before Step 0** and before any Azure mutation. They are ideal for pre-flight validation — such as verifying that an approved ServiceNow ticket exists.
+
+A gate check is registered with `register_gate`. By default `stop_on_error=True`, meaning a failing gate aborts the entire workflow immediately.
+
+```python
+from subscription_vending.workflow import register_gate, StepContext
+
+@register_gate
+async def require_snow_ticket(ctx: StepContext) -> None:
+    if not ctx.config.snow_ticket:
+        ctx.result.errors.append("No ServiceNow ticket on subscription")
+```
+
+Gate checks run in registration order. They do **not** participate in the topological sort and cannot declare `depends_on`.
+
+`register_gate` is also re-exported from `subscription_vending` directly.
+
+### `stop_on_error`
+
+Both gate checks and regular provisioning steps support `stop_on_error`:
+
+| Usage | Default | Behaviour |
+|-------|---------|----------|
+| `@register_gate` | `True` | Abort workflow if gate records an error |
+| `@register_step` | `False` | Record error and continue remaining steps |
+| `MyStep().register()` | `False` | Same as above |
+
+```python
+# Abort all remaining steps if this critical step fails
+@register_step(depends_on=[STEP_MG], stop_on_error=True)
+async def critical_validation(ctx: StepContext) -> None:
+    ...
+
+# Soft gate — warns but does not abort
+@register_gate(stop_on_error=False)
+async def advisory_check(ctx: StepContext) -> None:
+    ...
+```
+
+---
+
+## Preflight dry-run
+
+Before committing a real event, you can validate that all prerequisites are in place by calling `POST /webhook/preflight`. This endpoint:
+
+- Runs all gate checks **with real ServiceNow calls** (read-only)
+- Simulates all provisioning steps in dry-run mode
+- Returns a structured `plan` list showing what would happen
+- Makes **no Azure changes**
+
+See [api.md](./api.md#post-webhookpreflight) for the full request/response schema.
+
+---
 
 The service fetches the subscription's tags from the Azure Subscription API using the configured credential. The tags are converted into a `SubscriptionConfig` object that drives the remaining steps.
 
@@ -44,6 +105,7 @@ The service fetches the subscription's tags from the Azure Subscription API usin
 | `itl-aks` | Flags the subscription for AKS/Flux setup |
 | `itl-budget` | EUR amount for the monthly cost budget |
 | `itl-owner` | E-mail address for budget alert notifications |
+| `itl-snow-ticket` | ServiceNow ticket number (e.g. `RITM0041872`) — required when the ServiceNow gate extension is active |
 
 If the subscription cannot be fetched, or a tag value is invalid, the step falls back to defaults and the workflow continues.
 
@@ -177,7 +239,8 @@ The workflow returns a `ProvisioningResult` object with the following fields:
 | `management_group` | `str` | Management group the subscription was moved to |
 | `initiative_id` | `str` | Initiative ID returned by the Authorization service |
 | `rbac_roles` | `list[str]` | IDs of successfully created role assignments |
-| `errors` | `list[str]` | Error messages from failed steps |
+| `errors` | `list[str]` | Error messages from failed steps or gates |
+| `plan` | `list[str]` | Human-readable list of what each step did or would do (populated in dry-run mode) |
 | `success` | `bool` *(property)* | `True` when `errors` is empty |
 | `dry_run` | `bool` | `True` when the workflow was invoked in dry-run mode |
 
@@ -235,7 +298,7 @@ A cycle or unregistered dependency is non-fatal: it is recorded in `result.error
 
 ## Built-in extensions
 
-Two extensions ship in the `extensions/` package and are auto-discovered:
+Two notification extensions and two **ServiceNow extensions** ship in the `extensions/` package. All are prefixed with `_` so they are not auto-discovered by default.
 
 ### `_webhook_notify.py` — plain HTTPS webhook
 
@@ -258,6 +321,51 @@ POSTs the provisioning result to a REST API endpoint using `Authorization: Beare
 | `VENDING_API_NOTIFY_TIMEOUT` | No | Timeout in seconds (default: `10`) |
 
 If the URL env var is not set, the extension silently skips.
+
+### `_servicenow_check.py` — ServiceNow ticket gate
+
+Runs as a **gate check** before any provisioning step. Queries the ServiceNow Table API to verify that the ticket on the subscription (from the `itl-snow-ticket` tag) exists and is in the required state.
+
+| Env var | Required | Description |
+|---------|----------|-------------|
+| `VENDING_SNOW_INSTANCE` | Yes | ServiceNow hostname, e.g. `myco.service-now.com` |
+| `VENDING_SNOW_USER` | Yes | ServiceNow username (basic auth) |
+| `VENDING_SNOW_PASSWORD` | Yes | ServiceNow password |
+| `VENDING_SNOW_TABLE` | No | Table to query (default: `sc_req_item`; use `change_request` for CHG) |
+| `VENDING_SNOW_REQUIRE_STATE` | No | Required `approval` or `state` value (default: `approved`; set to `""` for existence-only) |
+| `VENDING_SNOW_TIMEOUT` | No | HTTP timeout in seconds (default: `10`) |
+
+The check is **read-only** and runs even in dry-run mode so preflight results are accurate.
+
+When `VENDING_SNOW_INSTANCE` is not set this gate is a no-op — the integration is opt-in.
+
+To enable, import the module explicitly in `main.py`:
+
+```python
+import subscription_vending.extensions._servicenow_check  # noqa: F401
+```
+
+### `_servicenow_feedback.py` — ServiceNow provisioning outcome
+
+Runs as a **provisioning step** after `STEP_NOTIFY`. PATCHes the ServiceNow ticket with `work_notes` describing the provisioning outcome and, optionally, transitions the ticket to a new state.
+
+| Env var | Required | Description |
+|---------|----------|-------------|
+| `VENDING_SNOW_INSTANCE` | Yes | ServiceNow hostname (shared with check extension) |
+| `VENDING_SNOW_USER` | Yes | ServiceNow username |
+| `VENDING_SNOW_PASSWORD` | Yes | ServiceNow password |
+| `VENDING_SNOW_TABLE` | No | Table to update (default: `sc_req_item`) |
+| `VENDING_SNOW_SUCCESS_STATE` | No | `state` value to set on success (e.g. `3` = Closed Complete). Leave empty to not change state. |
+| `VENDING_SNOW_FAILURE_STATE` | No | `state` value to set on failure (e.g. `4` = Closed Incomplete). Leave empty to not change state. |
+| `VENDING_SNOW_TIMEOUT` | No | HTTP timeout in seconds (default: `10`) |
+
+Feedback failures (e.g. ServiceNow unreachable) are **non-fatal** — they are logged as warnings and do not affect `result.errors`.
+
+To enable, import the module explicitly in `main.py`:
+
+```python
+import subscription_vending.extensions._servicenow_feedback  # noqa: F401
+```
 
 ---
 

@@ -152,6 +152,35 @@ Posts the provisioning result as JSON to a REST API endpoint using Bearer token 
 
 ---
 
+### ServiceNow check (`extensions/_servicenow_check.py`)
+
+Gate check that validates a ServiceNow ticket before any provisioning step runs. The check is read-only and runs even during dry-run.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VENDING_SNOW_INSTANCE` | `""` | ServiceNow instance hostname (e.g. `myco.service-now.com`). Leave empty to disable. |
+| `VENDING_SNOW_USER` | `""` | ServiceNow username for basic authentication. |
+| `VENDING_SNOW_PASSWORD` | `""` | ServiceNow password for basic authentication. |
+| `VENDING_SNOW_TABLE` | `sc_req_item` | Table to query. Use `change_request` for CHG tickets. |
+| `VENDING_SNOW_REQUIRE_STATE` | `approved` | Required value of the `approval` or `state` field. Set to `""` to check existence only. |
+| `VENDING_SNOW_TIMEOUT` | `10` | HTTP timeout in seconds. |
+
+### ServiceNow feedback (`extensions/_servicenow_feedback.py`)
+
+Provisioning step that PATCHes the ServiceNow ticket with the outcome after `STEP_NOTIFY`. Feedback failures are non-fatal.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VENDING_SNOW_INSTANCE` | `""` | ServiceNow instance hostname. Shared with check extension. Leave empty to disable. |
+| `VENDING_SNOW_USER` | `""` | ServiceNow username. Shared with check extension. |
+| `VENDING_SNOW_PASSWORD` | `""` | ServiceNow password. Shared with check extension. |
+| `VENDING_SNOW_TABLE` | `sc_req_item` | Table to update. |
+| `VENDING_SNOW_SUCCESS_STATE` | `""` | `state` value to set when provisioning succeeds (e.g. `3` = Closed Complete). Leave empty to not change state. |
+| `VENDING_SNOW_FAILURE_STATE` | `""` | `state` value to set when provisioning fails (e.g. `4` = Closed Incomplete). Leave empty to not change state. |
+| `VENDING_SNOW_TIMEOUT` | `10` | HTTP timeout in seconds. |
+
+---
+
 ## Tag-based provisioning
 
 Azure subscription tags are read at the start of the provisioning workflow. They override defaults derived from environment variables.
@@ -161,8 +190,7 @@ Azure subscription tags are read at the start of the provisioning workflow. They
 | `itl-environment` | Any string (e.g. `production`, `staging`, `acceptance`, `customer-a`) | Selects the target management group via `VENDING_ENVIRONMENT_MG_MAPPING`. Also determines policy enforcement mode (`Default` for `production`, `DoNotEnforce` for all others). | `sandbox` MG |
 | `itl-aks` | `true`, `false` | Marks the subscription for AKS/Flux base chart installation. | `false` |
 | `itl-budget` | Integer (e.g. `500`) | Creates a monthly Azure Cost Management budget at the specified EUR amount with e-mail alerts at 80 % and 100 %. | No budget alert |
-| `itl-owner` | E-mail address | Contact address for budget alert notifications. Overrides `VENDING_DEFAULT_ALERT_EMAIL`. | `VENDING_DEFAULT_ALERT_EMAIL` |
-
+| `itl-owner` | E-mail address | Contact address for budget alert notifications. Overrides `VENDING_DEFAULT_ALERT_EMAIL`. | `VENDING_DEFAULT_ALERT_EMAIL` || `itl-snow-ticket` | Ticket number (e.g. `RITM0041872`) | Validated by the ServiceNow gate check before provisioning starts. Required when `_servicenow_check` extension is active. Updated with the provisioning outcome by the `_servicenow_feedback` extension. | *(gate skipped if absent and SNOW not configured)* |
 Invalid tag values are silently ignored and the corresponding default is used, so provisioning always continues even when tags are malformed.
 
 ### Configurable tag key names
@@ -175,6 +203,7 @@ The tag key names shown above are defaults. You can override them to match your 
 | `VENDING_TAG_AKS` | `itl-aks` | Tag key used to enable AKS/Flux setup |
 | `VENDING_TAG_BUDGET` | `itl-budget` | Tag key for the monthly budget amount in EUR |
 | `VENDING_TAG_OWNER` | `itl-owner` | Tag key for the budget alert e-mail address |
+| `VENDING_TAG_SNOW_TICKET` | `itl-snow-ticket` | Tag key for the ServiceNow ticket number |
 
 For example, to use `myorg-environment` instead of `itl-environment`:
 

@@ -93,6 +93,54 @@ The provisioning workflow runs asynchronously within the request. Event Grid alw
 
 ---
 
+### `POST /webhook/preflight`
+
+Validates prerequisites and returns a dry-run plan showing what the provisioning workflow *would* do, without making any Azure changes. Always available — not gated by `VENDING_MOCK_MODE`.
+
+The ServiceNow gate check (if configured) is executed with a **real HTTP call** during preflight so you get an accurate ticket validation result.
+
+#### Request body
+
+```json
+{
+  "subscription_id": "00000000-0000-0000-0000-000000000001",
+  "subscription_name": "my-new-subscription",
+  "management_group_id": "ITL-Development",
+  "snow_ticket": "RITM0041872"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `subscription_id` | `string` | Yes | Subscription ID to simulate provisioning for |
+| `subscription_name` | `string` | No | Display name of the subscription |
+| `management_group_id` | `string` | No | Target management group (subscription tags take precedence) |
+| `snow_ticket` | `string` | No | ServiceNow ticket number to validate. Overrides the `itl-snow-ticket` tag on the subscription for this preflight run only. |
+
+#### Response `200 OK`
+
+```json
+{
+  "gate_passed": true,
+  "steps": [
+    { "description": "[SNOW gate] Ticket 'RITM0041872' validated — approval='approved'", "status": "planned" },
+    { "description": "[STEP_MG] Move subscription to management group 'ITL-Development'", "status": "planned" },
+    { "description": "[STEP_RBAC] Assign Owner to platform SPN", "status": "planned" }
+  ],
+  "errors": [],
+  "summary": "3 steps planned, 0 blocked"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `gate_passed` | `boolean` | `true` if all gate checks passed |
+| `steps` | `list` | Ordered list of `{description, status}` entries. `status` is `"planned"` for steps that would run or `"blocked"` for steps skipped due to a gate failure. |
+| `errors` | `list[string]` | Error messages from failed gate checks or step simulations |
+| `summary` | `string` | Human-readable summary line |
+
+---
+
 ### `POST /webhook/test` *(mock mode only)*
 
 Triggers the provisioning workflow directly without a real Event Grid event. Only available when `VENDING_MOCK_MODE=true`.

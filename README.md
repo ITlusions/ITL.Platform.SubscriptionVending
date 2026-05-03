@@ -13,19 +13,20 @@ The service listens to Azure Event Grid events and executes a fixed provisioning
 
 1. Azure creates a subscription (`Microsoft.Subscription/aliases/write`).
 2. An Azure Event Grid system topic fires a `Microsoft.Resources.ResourceActionSuccess` event and delivers it via HTTP POST to `POST /webhook/` on this service.
-3. The service runs the provisioning workflow for the new subscription (Steps 0–6):
+3. The service runs the provisioning workflow for the new subscription:
 
-   | Step | Action |
-   |------|--------|
-   | 0 | Read subscription tags — drives the remaining steps |
-   | 1 | Move the subscription to the correct management group |
-   | 2 | Attach the ITL Foundation Policy Initiative (via the Authorization service) |
-   | 3 | Create default RBAC role assignments |
-   | 4 | Assign default Azure Policy definitions |
-   | 5 | Create a Cost Management budget alert *(only when `itl-budget` tag is set)* |
-   | 6 | Publish an outbound `SubscriptionProvisioned` event *(only when `VENDING_EVENT_GRID_TOPIC_ENDPOINT` is set)* |
+   | Phase | Action |
+   |-------|--------|
+   | **Gates** | Pre-flight checks (e.g. ServiceNow ticket validation). A failing gate with `stop_on_error=True` aborts all provisioning. |
+   | Step 0 | Read subscription tags — drives the remaining steps |
+   | Step 1 | Move the subscription to the correct management group |
+   | Step 2 | Attach the ITL Foundation Policy Initiative (via the Authorization service) |
+   | Step 3 | Create default RBAC role assignments |
+   | Step 4 | Assign default Azure Policy definitions |
+   | Step 5 | Create a Cost Management budget alert *(only when `itl-budget` tag is set)* |
+   | Step 6 | Publish an outbound `SubscriptionProvisioned` event *(only when `VENDING_EVENT_GRID_TOPIC_ENDPOINT` is set)* |
 
-4. A `ProvisioningResult` is logged. Each step is **independent** — a failure in one step is recorded but never prevents the remaining steps from running.
+4. A `ProvisioningResult` is logged. Each provisioning step is **independent** by default — a failure is recorded but does not stop subsequent steps.
 5. The webhook always returns `200 OK` so Event Grid does not retry.
 
 See [docs/provisioning-workflow.md](./docs/provisioning-workflow.md) for full details on each step.
@@ -79,7 +80,16 @@ ITL.Platform.SubscriptionVending/
         ├── workflow.py
         ├── handlers/
         │   ├── event_grid.py
-        │   └── mock.py
+        │   ├── mock.py
+        │   └── preflight.py
+        ├── extensions/
+        │   ├── _webhook_notify.py
+        │   ├── _api_notify.py
+        │   ├── _servicenow_check.py
+        │   └── _servicenow_feedback.py
+        ├── core/
+        │   ├── base.py
+        │   └── events.py
         └── azure/
             ├── management_groups.py
             ├── notifications.py
@@ -154,6 +164,7 @@ curl -X POST http://localhost:8000/webhook/test \
 |----------|-------------|
 | `GET /health` | Liveness check — returns `{"status": "ok"}`. Used by Kubernetes probes. |
 | `POST /webhook/` | **Event Grid target URL.** Receives subscription-created events and runs the provisioning workflow. Also handles the Event Grid validation handshake. Configure `VENDING_EVENT_GRID_SAS_KEY` to restrict access. |
+| `POST /webhook/preflight` | **Dry-run validation.** Validates the ServiceNow ticket (read-only) and returns a structured plan of what provisioning would do — without making any Azure changes. |
 | `POST /webhook/test` | Mock trigger for the provisioning workflow. Only available when `VENDING_MOCK_MODE=true`. |
 | `GET /docs` | Interactive Swagger UI (available when the service is running). |
 | `GET /redoc` | ReDoc API reference. |
@@ -190,6 +201,15 @@ See [`.env.example`](.env.example) for a full annotated list, and [docs/configur
 | `VENDING_TAG_AKS` | `itl-aks` | Tag key to enable AKS/Flux setup |
 | `VENDING_TAG_BUDGET` | `itl-budget` | Tag key for the monthly budget amount in EUR |
 | `VENDING_TAG_OWNER` | `itl-owner` | Tag key for the budget alert e-mail address |
+| `VENDING_TAG_SNOW_TICKET` | `itl-snow-ticket` | Tag key for the ServiceNow ticket number |
+| `VENDING_SNOW_INSTANCE` | `""` | ServiceNow hostname (e.g. `myco.service-now.com`). Required for ServiceNow integration. |
+| `VENDING_SNOW_USER` | `""` | ServiceNow username (basic auth) |
+| `VENDING_SNOW_PASSWORD` | `""` | ServiceNow password (basic auth) |
+| `VENDING_SNOW_TABLE` | `sc_req_item` | ServiceNow table to query / update |
+| `VENDING_SNOW_REQUIRE_STATE` | `approved` | Required ticket state before provisioning is allowed |
+| `VENDING_SNOW_TIMEOUT` | `10` | HTTP timeout in seconds for ServiceNow calls |
+| `VENDING_SNOW_SUCCESS_STATE` | `""` | State to set on ticket after successful provisioning |
+| `VENDING_SNOW_FAILURE_STATE` | `""` | State to set on ticket after failed provisioning |
 
 #### Environment → Management Group mapping
 
@@ -220,6 +240,7 @@ Subscriptions can carry Azure resource tags that control how they are provisione
 | `itl-aks` | `true` / `false` | Signals that AKS base charts should be installed via Flux |
 | `itl-budget` | Integer amount in EUR (e.g. `500`) | Creates an Azure Cost Management budget with e-mail alerts at 80 % and 100 % |
 | `itl-owner` | E-mail address | Contact for budget alerts; overrides `VENDING_DEFAULT_ALERT_EMAIL` |
+| `itl-snow-ticket` | Ticket number (e.g. `RITM0041872`) | ServiceNow ticket to validate before provisioning and update with the outcome |
 
 Invalid tag values are silently ignored and fall back to defaults so provisioning always continues.
 
