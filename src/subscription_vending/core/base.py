@@ -24,11 +24,14 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 import httpx
 
-from ..workflow import StepContext, WorkflowStep, register_step
 from .events import LifecycleEvent, on as _on_event
+
+if TYPE_CHECKING:
+    from ..workflow import StepContext, WorkflowStep
 
 
 class BaseStep(ABC):
@@ -150,5 +153,6 @@ class BaseStep(ABC):
             step_a = StepA().register()
             StepB().register(depends_on=[step_a])
         """
+        from ..workflow import register_step  # noqa: PLC0415
         register_step(self, depends_on=depends_on)
         return self
