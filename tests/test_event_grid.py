@@ -73,27 +73,30 @@ def test_extract_subscription_id_from_resource_uri_and_subject():
 def test_workflow_error_is_logged_and_not_reraised(client, monkeypatch, caplog):
     monkeypatch.setattr(event_grid._settings, "event_grid_sas_key", "")
 
-    async def _failing_workflow(**kwargs):  # noqa: ARG001
+    async def _failing_dispatch(**kwargs):  # noqa: ARG001
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(event_grid, "run_provisioning_workflow", _failing_workflow)
+    monkeypatch.setattr(event_grid, "dispatch", _failing_dispatch)
 
     with caplog.at_level(logging.ERROR):
         response = client.post("/webhook/", json=[_subscription_created_event()])
 
     assert response.status_code == 200
-    assert "Error provisioning sub-1" in caplog.text
+    assert "Error dispatching sub-1" in caplog.text
 
 
 def test_batch_of_events_is_processed(client, monkeypatch):
     monkeypatch.setattr(event_grid._settings, "event_grid_sas_key", "")
     processed: list[str] = []
 
-    async def _fake_workflow(**kwargs):
-        processed.append(kwargs["subscription_id"])
-        return {"management_group": "ok", "rbac": "ok", "policy": "ok"}
+    from subscription_vending.workflow import ProvisioningResult
 
-    monkeypatch.setattr(event_grid, "run_provisioning_workflow", _fake_workflow)
+    async def _fake_dispatch(subscription_id, **kwargs):
+        processed.append(subscription_id)
+        r = ProvisioningResult(subscription_id=subscription_id)
+        return r, False
+
+    monkeypatch.setattr(event_grid, "dispatch", _fake_dispatch)
 
     response = client.post(
         "/webhook/",
