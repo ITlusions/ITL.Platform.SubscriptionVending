@@ -45,28 +45,25 @@
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
-    }
-
-    .nav-inner {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 0 24px;
+      padding: 0 2rem;
       display: flex;
       align-items: center;
-      gap: 8px;
+      justify-content: space-between;
       height: 56px;
-      flex-wrap: wrap;
     }
 
-    .nav-logo {
-      font-weight: 700;
-      font-size: 0.95rem;
-      color: var(--accent2);
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text);
       text-decoration: none;
-      margin-right: 16px;
       white-space: nowrap;
     }
-    .nav-logo:hover { color: #fff; }
+    .nav-brand:hover { color: var(--accent2); }
+    .nav-brand svg { flex-shrink: 0; }
 
     .nav-links {
       display: flex;
@@ -270,19 +267,23 @@
 <body>
 
 <nav>
-  <div class="nav-inner">
-    <a class="nav-logo" href="{{ '/' | relative_url }}">ITL Subscription Vending</a>
-    <ul class="nav-links">
-      <li><a href="{{ '/provisioning-workflow' | relative_url }}"{% if page.url contains 'provisioning-workflow' %} class="active"{% endif %}>Workflow</a></li>
-      <li><a href="{{ '/architecture' | relative_url }}"{% if page.url contains 'architecture' %} class="active"{% endif %}>Architecture</a></li>
-      <li><a href="{{ '/api' | relative_url }}"{% if page.url contains '/api' %} class="active"{% endif %}>API</a></li>
-      <li><a href="{{ '/kubernetes' | relative_url }}"{% if page.url contains 'kubernetes' %} class="active"{% endif %}>Kubernetes</a></li>
-      <li><a href="{{ '/infrastructure' | relative_url }}"{% if page.url contains 'infrastructure' %} class="active"{% endif %}>Infrastructure</a></li>
-      <li><a href="{{ '/configuration' | relative_url }}"{% if page.url contains 'configuration' %} class="active"{% endif %}>Configuration</a></li>
-      <li><a href="{{ '/secrets' | relative_url }}"{% if page.url contains 'secrets' %} class="active"{% endif %}>Secrets</a></li>
-      <li><a href="{{ '/development' | relative_url }}"{% if page.url contains 'development' %} class="active"{% endif %}>Dev Guide</a></li>
-    </ul>
-  </div>
+  <a class="nav-brand" href="{{ '/' | relative_url }}">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+    ITL Subscription Vending
+  </a>
+  <ul class="nav-links">
+    <li><a href="{{ '/provisioning-workflow' | relative_url }}"{% if page.url contains 'provisioning-workflow' %} class="active"{% endif %}>Workflow</a></li>
+    <li><a href="{{ '/architecture' | relative_url }}"{% if page.url contains 'architecture' %} class="active"{% endif %}>Architecture</a></li>
+    <li><a href="{{ '/api' | relative_url }}"{% if page.url contains '/api' %} class="active"{% endif %}>API</a></li>
+    <li><a href="{{ '/kubernetes' | relative_url }}"{% if page.url contains 'kubernetes' %} class="active"{% endif %}>Kubernetes</a></li>
+    <li><a href="{{ '/infrastructure' | relative_url }}"{% if page.url contains 'infrastructure' %} class="active"{% endif %}>Infrastructure</a></li>
+    <li><a href="{{ '/configuration' | relative_url }}"{% if page.url contains 'configuration' %} class="active"{% endif %}>Configuration</a></li>
+    <li><a href="{{ '/secrets' | relative_url }}"{% if page.url contains 'secrets' %} class="active"{% endif %}>Secrets</a></li>
+    <li><a href="{{ '/development' | relative_url }}"{% if page.url contains 'development' %} class="active"{% endif %}>Dev Guide</a></li>
+  </ul>
 </nav>
 
 <main class="page-wrapper">
