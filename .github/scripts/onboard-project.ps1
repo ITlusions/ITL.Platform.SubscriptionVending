@@ -88,6 +88,7 @@ param(
     [int]    $SprintLengthDays = 14,
     [string] $SprintStartDate  = (Get-Date -Format "yyyy-MM-dd"),
     [switch] $CreateLabels,
+    [switch] $CreateViews,
     [switch] $SkipIfExists
 )
 
@@ -109,7 +110,11 @@ function Invoke-Gql {
     return $result.data
 }
 
-$totalSteps = if ($SprintCount -gt 0 -or $CreateLabels) { 8 } else { 6 }
+$baseSteps = 6
+if ($CreateViews)       { $baseSteps++ }
+if ($SprintCount -gt 0) { $baseSteps++ }
+if ($CreateLabels)      { $baseSteps++ }
+$totalSteps = $baseSteps
 $step       = 0
 function Step { param([string]$Msg); $script:step++; Write-Host "[$script:step/$totalSteps] $Msg" -ForegroundColor Cyan }
 
@@ -226,7 +231,63 @@ if ($RepoName -ne "") {
 }
 
 # ---------------------------------------------------------------------------
-# 7. Create sprint milestones (optional)
+# 7. Generate views setup guide (optional)
+# Note: GitHub Projects v2 does not expose view creation via API or CLI.
+#       This step queries field IDs and outputs exact setup instructions
+#       + filter-query URLs so you can configure views in the UI in seconds.
+# ---------------------------------------------------------------------------
+if ($CreateViews) {
+    Step "Generating views setup guide..."
+
+    # Re-query field node IDs (needed for groupBy references)
+    $fq     = 'query($login: String!, $num: Int!) { organization(login: $login) { projectV2(number: $num) { fields(first: 30) { nodes { __typename ... on ProjectV2Field { id name } ... on ProjectV2SingleSelectField { id name } ... on ProjectV2IterationField { id name } } } } } }'
+    $fNodes = (Invoke-Gql $fq @{ login = $Org; num = "$projectNumber" }).organization.projectV2.fields.nodes
+    $fMap   = @{}
+    foreach ($f in $fNodes) {
+        if ($f.PSObject.Properties["name"] -and $f.PSObject.Properties["id"]) { $fMap[$f.name] = $f.id }
+    }
+
+    $baseUrl = "https://github.com/orgs/$Org/projects/$projectNumber"
+
+    $views = [ordered]@{
+        "Board"        = @{ layout = "Board";   groupBy = "Status";   filter = "";                  note = "Kanban by Status" }
+        "Sprint Board" = @{ layout = "Board";   groupBy = "Status";   filter = "sprint:@current"; note = "Current sprint only" }
+        "Backlog"      = @{ layout = "Table";   groupBy = "Priority"; filter = "";                  note = "All items, sorted by Priority" }
+    }
+    if ($Preset -eq "full") {
+        $views["Epics"] = @{ layout = "Table"; groupBy = "Epic"; filter = ""; note = "Grouped by Epic" }
+    }
+
+    Write-Host ""
+    Write-Host "  -- Views to create in the GitHub UI --" -ForegroundColor Yellow
+    Write-Host "  Open: $baseUrl" -ForegroundColor DarkCyan
+    Write-Host ""
+
+    $i = 1
+    foreach ($vName in $views.Keys) {
+        $v         = $views[$vName]
+        $groupId   = if ($fMap.ContainsKey($v.groupBy)) { $fMap[$v.groupBy] } else { "" }
+        $url        = if ($v.filter -ne "") { "$baseUrl`?query=$([uri]::EscapeDataString($v.filter))" } else { $baseUrl }
+
+        Write-Host "  [$i] $vName  ($($v.note))" -ForegroundColor White
+        Write-Host "      Layout  : $($v.layout)" -ForegroundColor Gray
+        Write-Host "      Group by: $($v.groupBy)  (field ID: $groupId)" -ForegroundColor Gray
+        if ($v.filter -ne "") {
+        Write-Host "      Filter  : $($v.filter)" -ForegroundColor Gray
+        Write-Host "      URL     : $url" -ForegroundColor DarkCyan
+        }
+        Write-Host ""
+        $i++
+    }
+
+    # Write views config to a file for reference
+    $guideFile = Join-Path (Split-Path $PSCommandPath) "views-setup.json"
+    $views | ConvertTo-Json -Depth 5 | Set-Content $guideFile -Encoding utf8
+    Write-Host "  Guide saved to: $guideFile" -ForegroundColor DarkGray
+}
+
+# ---------------------------------------------------------------------------
+# 8 (was 7). Create sprint milestones (optional)
 # ---------------------------------------------------------------------------
 if ($SprintCount -gt 0) {
     if ($RepoName -eq "") { Write-Warning "Skipping milestones: -RepoName is required."; $SprintCount = 0 }
@@ -255,7 +316,7 @@ if ($SprintCount -gt 0) {
 }
 
 # ---------------------------------------------------------------------------
-# 8. Create type labels (optional)
+# 9 (was 8). Create type labels (optional)
 # ---------------------------------------------------------------------------
 $typeLabelMap = @{
     "Epic"  = @{ color = "6e40c9"; description = "Large body of work spanning multiple sprints" }
@@ -306,12 +367,13 @@ if ($Preset -eq "full") {
     Write-Host "  Type, Effort, Epic, Blocked, Risk" -ForegroundColor Yellow
 }
 Write-Host ""
-Write-Host "Next steps (in the GitHub UI):" -ForegroundColor Yellow
-Write-Host "  1. Sprint -> Settings -> set duration + start date"
-Write-Host "  2. Add a Board view  (group by Status)"
-Write-Host "  3. Add a Sprint view (group by Sprint, filter: current iteration)"
-Write-Host "  4. Add a Backlog view (no Sprint filter, sort by Priority)"
-if ($Preset -eq "full") {
-    Write-Host "  5. Add an Epics view (filter Work Type = Epic, group by Epic)"
+Write-Host "Next steps:" -ForegroundColor Yellow
+Write-Host "  1. Sprint field -> Settings -> set duration + start date"
+if ($CreateViews) {
+    Write-Host "  2. Create the views listed above (run with -CreateViews for field IDs + URLs)"
+} else {
+    Write-Host "  2. Re-run with -CreateViews for a views setup guide with exact field IDs"
+    Write-Host "     Or create manually: Board (group Status), Sprint Board (filter sprint:@current),"
+    Write-Host "     Backlog (table), $(if ($Preset -eq 'full') { 'Epics (group Epic)' })"
 }
 Write-Host ""

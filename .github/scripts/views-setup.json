@@ -1,0 +1,26 @@
+﻿{
+    "Board":  {
+                  "filter":  "",
+                  "layout":  "Board",
+                  "note":  "Kanban by Status",
+                  "groupBy":  "Status"
+              },
+    "Sprint Board":  {
+                         "filter":  "sprint:@current",
+                         "layout":  "Board",
+                         "note":  "Current sprint only",
+                         "groupBy":  "Status"
+                     },
+    "Backlog":  {
+                    "filter":  "",
+                    "layout":  "Table",
+                    "note":  "All items, sorted by Priority",
+                    "groupBy":  "Priority"
+                },
+    "Epics":  {
+                  "filter":  "",
+                  "layout":  "Table",
+                  "note":  "Grouped by Epic",
+                  "groupBy":  "Epic"
+              }
+}
