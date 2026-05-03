@@ -40,29 +40,91 @@ class StepContext:
 # Type alias for a custom step coroutine.
 WorkflowStep = Callable[[StepContext], Awaitable[None]]
 
-_EXTRA_STEPS: list[WorkflowStep] = []
+
+@dataclass
+class _StepEntry:
+    fn: WorkflowStep
+    depends_on: list[WorkflowStep] = field(default_factory=list)
 
 
-def register_step(fn: WorkflowStep) -> WorkflowStep:
+_EXTRA_STEPS: list[_StepEntry] = []
+
+
+def _toposort(entries: list[_StepEntry]) -> list[WorkflowStep]:
+    """Return custom steps ordered so every dependency runs before its dependent.
+
+    Raises ``ValueError`` if a declared dependency is not registered, or if a
+    dependency cycle is detected.
+    """
+    fn_to_entry: dict[WorkflowStep, _StepEntry] = {e.fn: e for e in entries}
+    visiting: set[WorkflowStep] = set()   # cycle detection
+    visited:  set[WorkflowStep] = set()
+    order:    list[WorkflowStep] = []
+
+    def _visit(fn: WorkflowStep) -> None:
+        if fn in visited:
+            return
+        if fn in visiting:
+            raise ValueError(
+                f"Dependency cycle detected involving custom step '{fn.__qualname__}'"
+            )
+        visiting.add(fn)
+        entry = fn_to_entry.get(fn)
+        if entry:
+            for dep in entry.depends_on:
+                if dep not in fn_to_entry:
+                    raise ValueError(
+                        f"Step '{fn.__qualname__}' depends on '{dep.__qualname__}' "
+                        "which is not registered."
+                    )
+                _visit(dep)
+        visiting.discard(fn)
+        visited.add(fn)
+        order.append(fn)
+
+    for entry in entries:
+        _visit(entry.fn)
+
+    return order
+
+
+def register_step(
+    fn: WorkflowStep | None = None,
+    *,
+    depends_on: list[WorkflowStep] | None = None,
+) -> WorkflowStep | Callable[[WorkflowStep], WorkflowStep]:
     """Register *fn* as an extra provisioning step.
 
-    Decorated steps run **after** all built-in steps (0–6) in the order they
-    are registered. A raised exception is caught, recorded in
-    ``ctx.result.errors``, and never prevents subsequent steps from running.
+    Decorated steps run **after** all built-in steps (0–6).  If multiple
+    steps are registered, they are sorted topologically according to the
+    ``depends_on`` declarations before execution.  A raised exception is
+    caught, recorded in ``ctx.result.errors``, and never prevents remaining
+    steps from running.
 
-    Usage::
+    Usage (no dependencies)::
 
         from subscription_vending.workflow import register_step, StepContext
 
         @register_step
         async def my_step(ctx: StepContext) -> None:
-            if ctx.config.environment != "production":
-                return
-            # ... your logic here ...
+            ...
+
+    Usage (with dependency)::
+
+        @register_step(depends_on=[my_step])
+        async def my_later_step(ctx: StepContext) -> None:
+            ...
     """
-    _EXTRA_STEPS.append(fn)
-    logger.debug("Registered custom workflow step: %s", fn.__qualname__)
-    return fn
+    def _register(f: WorkflowStep) -> WorkflowStep:
+        _EXTRA_STEPS.append(_StepEntry(fn=f, depends_on=list(depends_on or [])))
+        logger.debug("Registered custom workflow step: %s", f.__qualname__)
+        return f
+
+    if fn is not None:
+        # Used as @register_step (no parentheses)
+        return _register(fn)
+    # Used as @register_step(depends_on=[...])
+    return _register
 
 
 @dataclass
@@ -184,7 +246,7 @@ async def run_provisioning_workflow(
         settings=settings,
     )
 
-    # Custom steps — registered via @register_step
+    # Custom steps — registered via @register_step, executed in dependency order
     if _EXTRA_STEPS:
         ctx = StepContext(
             subscription_id=subscription_id,
@@ -193,7 +255,13 @@ async def run_provisioning_workflow(
             settings=settings,
             result=result,
         )
-        for step in _EXTRA_STEPS:
+        try:
+            ordered_steps = _toposort(_EXTRA_STEPS)
+        except ValueError as exc:
+            result.errors.append(f"Custom step ordering failed: {exc}")
+            logger.exception("Failed to resolve custom workflow step order")
+            ordered_steps = []
+        for step in ordered_steps:
             try:
                 logger.info("Running custom workflow step: %s", step.__qualname__)
                 await step(ctx)
