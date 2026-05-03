@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from ..config import Settings
 from ..models import EventGridEvent
-from ..workflow import run_provisioning_workflow
+from ..retry.dispatcher import dispatch
 
 logger = logging.getLogger(__name__)
 
@@ -92,15 +92,19 @@ async def receive_event(
         logger.info("New subscription received: %s", subscription_id)
 
         try:
-            await run_provisioning_workflow(
+            _result, should_error = await dispatch(
                 subscription_id=subscription_id,
                 subscription_name=data.get("displayName", ""),
                 management_group_id=data.get("managementGroupId", ""),
                 settings=_settings,
             )
+            if should_error:
+                # dead_letter strategy: return 500 so Event Grid retries
+                return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as exc:  # noqa: BLE001
-            logger.exception("Error provisioning %s: %s", subscription_id, exc)
-            # Do not re-raise — Event Grid would send repeated retries otherwise
+            logger.exception("Error dispatching %s: %s", subscription_id, exc)
+            if _settings.retry_strategy == "dead_letter":
+                return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     return Response(status_code=status.HTTP_200_OK)
 
