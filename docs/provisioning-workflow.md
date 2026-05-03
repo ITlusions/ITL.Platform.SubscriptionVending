@@ -156,6 +156,7 @@ The workflow returns a `ProvisioningResult` object with the following fields:
 | `rbac_roles` | `list[str]` | IDs of successfully created role assignments |
 | `errors` | `list[str]` | Error messages from failed steps |
 | `success` | `bool` *(property)* | `True` when `errors` is empty |
+| `dry_run` | `bool` | `True` when the workflow was invoked in dry-run mode |
 
 All results are logged at `INFO` level. Errors are additionally logged at `ERROR` level with full stack traces.
 

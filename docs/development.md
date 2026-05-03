@@ -110,6 +110,19 @@ curl -X POST http://localhost:8000/webhook/test \
   }'
 ```
 
+Add `"dry_run": true` to skip all Azure mutations and outbound HTTP calls — only log output is produced:
+
+```bash
+curl -X POST http://localhost:8000/webhook/test \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subscription_id": "00000000-0000-0000-0000-000000000001",
+    "subscription_name": "local-test-sub",
+    "management_group_id": "ITL-Development",
+    "dry_run": true
+  }'
+```
+
 > **Note:** "Mock mode" only enables the `/webhook/test` endpoint — it does not stub out Azure SDK calls. The full provisioning workflow is executed, including calls to the Azure Management Groups, RBAC, and Policy APIs. These calls will fail in a local environment without valid Azure credentials, but each step's error is caught, logged, and appended to the result without crashing the service. This makes the endpoint useful for verifying request routing and partial workflow logic.
 
 ---
@@ -150,6 +163,10 @@ The test suite uses `pytest-asyncio` in `auto` mode, so all `async` test functio
 
 ```
 src/subscription_vending/   # Application source
+  azure/                    # Azure SDK wrappers (management groups, RBAC, policy, etc.)
+  core/                     # Shared internals (BaseStep ABC, lifecycle event bus)
+  extensions/               # Auto-discovered extension modules
+  handlers/                 # FastAPI route handlers
 tests/                      # Pytest test suite
 infra/                      # Bicep IaC templates
 k8s/                        # Kubernetes manifests

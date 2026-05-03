@@ -103,7 +103,8 @@ Triggers the provisioning workflow directly without a real Event Grid event. Onl
 {
   "subscription_id": "00000000-0000-0000-0000-000000000001",
   "subscription_name": "my-test-subscription",
-  "management_group_id": "ITL-Development"
+  "management_group_id": "ITL-Development",
+  "dry_run": false
 }
 ```
 
@@ -112,6 +113,7 @@ Triggers the provisioning workflow directly without a real Event Grid event. Onl
 | `subscription_id` | `string` | Yes | — | Subscription ID to provision |
 | `subscription_name` | `string` | No | `mock-subscription` | Display name |
 | `management_group_id` | `string` | No | `""` | Target management group (overridden by subscription tags) |
+| `dry_run` | `boolean` | No | `false` | When `true`, log what would happen without making any Azure calls or outbound HTTP requests |
 
 **Response** `200 OK`
 
@@ -123,7 +125,7 @@ Triggers the provisioning workflow directly without a real Event Grid event. Onl
 }
 ```
 
-`status` is `"error"` if the provisioning workflow returned any errors.
+`status` is `"error"` if the provisioning workflow returned any errors. When `dry_run` was `true`, all Azure mutations are skipped and only log output is produced.
 
 ---
 

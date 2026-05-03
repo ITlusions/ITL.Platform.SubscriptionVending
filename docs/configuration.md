@@ -124,6 +124,34 @@ The following variables control which Azure AD principals receive default role a
 
 ---
 
+## Extensions
+
+These variables are read by the built-in extension modules in `extensions/`. They are optional — leave them unset to disable the corresponding extension.
+
+### Webhook notify (`extensions/_webhook_notify.py`)
+
+Posts the provisioning result as JSON to a plain HTTPS endpoint after each workflow run.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VENDING_WEBHOOK_URL` | `""` | HTTPS endpoint to POST to. Leave empty to disable. |
+| `VENDING_WEBHOOK_SECRET` | `""` | Sent as the `X-Webhook-Secret` header. Leave empty to omit the header. |
+| `VENDING_WEBHOOK_TIMEOUT` | `10` | Request timeout in seconds. |
+
+### API notify (`extensions/_api_notify.py`)
+
+Posts the provisioning result as JSON to a REST API endpoint using Bearer token authentication.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VENDING_API_NOTIFY_URL` | `""` | API endpoint to POST to. Leave empty to disable. |
+| `VENDING_API_NOTIFY_TOKEN` | `""` | Bearer token value sent as `Authorization: Bearer <token>`. Leave empty to omit the header. |
+| `VENDING_API_NOTIFY_TIMEOUT` | `10` | Request timeout in seconds. |
+
+> Both extension files are prefixed with `_` which means they are **not** auto-discovered. To enable one, rename it (remove the leading `_`) or create a thin wrapper module in `extensions/` that imports and registers it manually.
+
+---
+
 ## Tag-based provisioning
 
 Azure subscription tags are read at the start of the provisioning workflow. They override defaults derived from environment variables.
