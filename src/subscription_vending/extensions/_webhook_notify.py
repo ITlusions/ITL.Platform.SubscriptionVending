@@ -19,7 +19,7 @@ import os
 import httpx
 
 from ..workflow import StepContext
-from .base import BaseStep
+from ..core.base import BaseStep
 
 logger = logging.getLogger(__name__)
 
