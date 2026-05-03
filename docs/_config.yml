@@ -1,7 +1,7 @@
 title: ITL Subscription Vending
 description: Automated Azure subscription provisioning via Event Grid
-baseurl: ""
-url: "https://itlusions.github.io/ITL.Platform.SubscriptionVending"
+baseurl: "/ITL.Platform.SubscriptionVending"
+url: "https://itlusions.github.io"
 
 # Build settings
 markdown: kramdown
