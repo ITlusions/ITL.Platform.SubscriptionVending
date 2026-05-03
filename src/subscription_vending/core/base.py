@@ -145,14 +145,17 @@ class BaseStep(ABC):
         self,
         *,
         depends_on: list[WorkflowStep] | None = None,
+        stop_on_error: bool = False,
     ) -> "BaseStep":
         """Register this step with the provisioning workflow.
 
-        Returns *self* so the instance can be stored and used as a dependency::
+        Set ``stop_on_error=True`` to abort all remaining steps when this step
+        records an error (either by raising or by appending to
+        ``ctx.result.errors``)::
 
-            step_a = StepA().register()
-            StepB().register(depends_on=[step_a])
+            step_a = StepA().register(stop_on_error=True)
+            StepB().register(depends_on=[step_a])   # skipped if step_a errors
         """
         from ..workflow import register_step  # noqa: PLC0415
-        register_step(self, depends_on=depends_on)
+        register_step(self, depends_on=depends_on, stop_on_error=stop_on_error)
         return self

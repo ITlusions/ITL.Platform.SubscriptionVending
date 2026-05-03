@@ -56,13 +56,14 @@ WorkflowStep = Callable[[StepContext], Awaitable[None]]
 class _StepEntry:
     fn: WorkflowStep
     depends_on: list[WorkflowStep] = field(default_factory=list)
+    stop_on_error: bool = False
 
 
 _EXTRA_STEPS: list[_StepEntry] = []
 
 
-def _toposort(entries: list[_StepEntry]) -> list[WorkflowStep]:
-    """Return custom steps ordered so every dependency runs before its dependent.
+def _toposort(entries: list[_StepEntry]) -> list[_StepEntry]:
+    """Return step entries ordered so every dependency runs before its dependent.
 
     Raises ``ValueError`` if a declared dependency is not registered, or if a
     dependency cycle is detected.
@@ -70,7 +71,7 @@ def _toposort(entries: list[_StepEntry]) -> list[WorkflowStep]:
     fn_to_entry: dict[WorkflowStep, _StepEntry] = {e.fn: e for e in entries}
     visiting: set[WorkflowStep] = set()   # cycle detection
     visited:  set[WorkflowStep] = set()
-    order:    list[WorkflowStep] = []
+    order:    list[_StepEntry] = []
 
     def _visit(fn: WorkflowStep) -> None:
         if fn in visited:
@@ -91,7 +92,7 @@ def _toposort(entries: list[_StepEntry]) -> list[WorkflowStep]:
                 _visit(dep)
         visiting.discard(fn)
         visited.add(fn)
-        order.append(fn)
+        order.append(fn_to_entry[fn])
 
     for entry in entries:
         _visit(entry.fn)
@@ -103,14 +104,16 @@ def register_step(
     fn: WorkflowStep | None = None,
     *,
     depends_on: list[WorkflowStep] | None = None,
+    stop_on_error: bool = False,
 ) -> WorkflowStep | Callable[[WorkflowStep], WorkflowStep]:
-    """Register *fn* as an extra provisioning step.
+    """Register *fn* as a provisioning step.
 
-    Decorated steps run **after** all built-in steps (0–6).  If multiple
-    steps are registered, they are sorted topologically according to the
-    ``depends_on`` declarations before execution.  A raised exception is
-    caught, recorded in ``ctx.result.errors``, and never prevents remaining
-    steps from running.
+    Decorated steps are executed in topological order (``depends_on``).
+    A raised exception is caught, recorded in ``ctx.result.errors``, and by
+    default does **not** prevent remaining steps from running.
+
+    Set ``stop_on_error=True`` to abort all remaining steps when this step
+    records an error (either by raising or by appending to ``ctx.result.errors``).
 
     Usage (no dependencies)::
 
@@ -120,14 +123,14 @@ def register_step(
         async def my_step(ctx: StepContext) -> None:
             ...
 
-    Usage (with dependency)::
+    Usage (with dependency and stop-on-error)::
 
-        @register_step(depends_on=[my_step])
-        async def my_later_step(ctx: StepContext) -> None:
+        @register_step(depends_on=[my_step], stop_on_error=True)
+        async def critical_step(ctx: StepContext) -> None:
             ...
     """
     def _register(f: WorkflowStep) -> WorkflowStep:
-        _EXTRA_STEPS.append(_StepEntry(fn=f, depends_on=list(depends_on or [])))
+        _EXTRA_STEPS.append(_StepEntry(fn=f, depends_on=list(depends_on or []), stop_on_error=stop_on_error))
         _name = getattr(f, "__qualname__", type(f).__qualname__)
         logger.debug("Registered workflow step: %s", _name)
         return f
@@ -135,7 +138,7 @@ def register_step(
     if fn is not None:
         # Used as @register_step (no parentheses)
         return _register(fn)
-    # Used as @register_step(depends_on=[...])
+    # Used as @register_step(depends_on=[...]) or @register_step(stop_on_error=True)
     return _register
 
 
@@ -346,14 +349,23 @@ async def run_provisioning_workflow(
             result.errors.append(f"Step ordering failed: {exc}")
             logger.exception("Failed to resolve workflow step order")
             ordered_steps = []
-        for step in ordered_steps:
-            _step_name = getattr(step, "__qualname__", type(step).__qualname__)
+        for entry in ordered_steps:
+            _step_name = getattr(entry.fn, "__qualname__", type(entry.fn).__qualname__)
+            errors_before = len(result.errors)
             try:
                 logger.info("Running workflow step: %s", _step_name)
-                await step(ctx)
+                await entry.fn(ctx)
             except Exception as exc:  # noqa: BLE001
                 result.errors.append(f"Step '{_step_name}' failed: {exc}")
                 logger.exception("Workflow step %s failed", _step_name)
+            if entry.stop_on_error and len(result.errors) > errors_before:
+                logger.warning(
+                    "Workflow aborted after step '%s' (stop_on_error=True); "
+                    "%d step(s) skipped.",
+                    _step_name,
+                    len(ordered_steps) - ordered_steps.index(entry) - 1,
+                )
+                break
 
     # Lifecycle events — fire after all steps
     await emit(LifecycleEvent.PROVISIONING_COMPLETED, ctx)
