@@ -37,7 +37,7 @@ jobs:
           destination: ./_site
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3.0.1
+        uses: actions/upload-pages-artifact@v5.0.0
 
   deploy:
     name: Deploy to GitHub Pages
