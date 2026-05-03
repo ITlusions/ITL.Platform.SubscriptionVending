@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 from .azure.management_groups import move_subscription_to_management_group
 from .azure.notifications import publish_provisioned_event
@@ -21,24 +22,30 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class StepContext:
-    """Passed to every custom workflow step.
+    """Passed to every workflow step.
 
     Attributes:
-        subscription_id:   The newly created Azure subscription ID.
-        subscription_name: Display name of the subscription.
-        config:            Tag-derived provisioning config (environment, budget, etc.).
-        settings:          Service settings / env-var config.
-        result:            Mutable result object — append to ``result.errors`` on failure.
-        dry_run:           When ``True`` no Azure mutations or outbound HTTP calls are
-                           made.  Steps should log what *would* happen instead.
+        subscription_id:          The newly created Azure subscription ID.
+        subscription_name:        Display name of the subscription.
+        config:                   Tag-derived provisioning config (environment, budget, etc.).
+        settings:                 Service settings / env-var config.
+        result:                   Mutable result object — append to ``result.errors`` on failure.
+        dry_run:                  When ``True`` no Azure mutations or outbound HTTP calls are
+                                  made.  Steps should log what *would* happen instead.
+        credential:               Azure credential object (``None`` in dry-run mode).
+        event_management_group_id: Management group ID from the Event Grid event payload.
+                                  Used as a fallback by :data:`STEP_MG` when no
+                                  ``itl-environment`` tag is present.
     """
 
-    subscription_id:   str
-    subscription_name: str
-    config:            SubscriptionConfig
-    settings:          Settings
-    result:            "ProvisioningResult"
-    dry_run:           bool = False
+    subscription_id:           str
+    subscription_name:         str
+    config:                    SubscriptionConfig
+    settings:                  Settings
+    result:                    "ProvisioningResult"
+    dry_run:                   bool = False
+    credential:                Any = None
+    event_management_group_id: str = ""
 
 
 # Type alias for a custom step coroutine.
@@ -121,7 +128,8 @@ def register_step(
     """
     def _register(f: WorkflowStep) -> WorkflowStep:
         _EXTRA_STEPS.append(_StepEntry(fn=f, depends_on=list(depends_on or [])))
-        logger.debug("Registered custom workflow step: %s", f.__qualname__)
+        _name = getattr(f, "__qualname__", type(f).__qualname__)
+        logger.debug("Registered workflow step: %s", _name)
         return f
 
     if fn is not None:
@@ -145,6 +153,131 @@ class ProvisioningResult:
         return len(self.errors) == 0
 
 
+# ── Built-in workflow steps (Steps 1–6) ───────────────────────────────────────
+# Registered at module import time so they participate in the same topological
+# sort as custom steps.  Use them as ``depends_on`` targets to insert a custom
+# step between any two built-in steps::
+#
+#     from subscription_vending.workflow import STEP_RBAC
+#     MyStep().register(depends_on=[STEP_RBAC])   # runs after RBAC, before policy
+
+
+@register_step
+async def STEP_MG(ctx: StepContext) -> None:
+    """Step 1 — Move subscription to the target management group."""
+    mg_id = (
+        ctx.config.management_group_name
+        or ctx.event_management_group_id
+        or ctx.settings.root_management_group
+    )
+    if ctx.dry_run:
+        logger.info("DRY RUN: would move subscription %s to management group %s", ctx.subscription_id, mg_id)
+        ctx.result.management_group = mg_id
+        return
+    try:
+        await move_subscription_to_management_group(
+            subscription_id=ctx.subscription_id,
+            management_group_id=mg_id,
+            settings=ctx.settings,
+        )
+        ctx.result.management_group = mg_id
+        logger.info("Subscription %s moved to management group %s", ctx.subscription_id, mg_id)
+    except Exception as exc:  # noqa: BLE001
+        ctx.result.errors.append(f"MG assignment failed: {exc}")
+        logger.exception("Failed to move subscription to management group")
+
+
+@register_step(depends_on=[STEP_MG])
+async def STEP_INITIATIVE(ctx: StepContext) -> None:
+    """Step 2 — Attach the ITL Foundation Policy Initiative."""
+    if ctx.dry_run:
+        logger.info("DRY RUN: would attach foundation initiative for subscription %s", ctx.subscription_id)
+        return
+    try:
+        initiative_id = await attach_foundation_initiative(
+            authorization_url=ctx.settings.authorization_service_url,
+            subscription_id=ctx.subscription_id,
+        )
+        ctx.result.initiative_id = initiative_id
+        logger.info("Foundation initiative attached for subscription %s: %s", ctx.subscription_id, initiative_id)
+    except Exception as exc:  # noqa: BLE001
+        ctx.result.errors.append(f"Foundation initiative failed: {exc}")
+        logger.exception("Failed to attach foundation initiative")
+
+
+@register_step(depends_on=[STEP_INITIATIVE])
+async def STEP_RBAC(ctx: StepContext) -> None:
+    """Step 3 — Assign default RBAC roles."""
+    if ctx.dry_run:
+        logger.info("DRY RUN: would assign default RBAC roles for subscription %s", ctx.subscription_id)
+        return
+    try:
+        roles = await create_initial_rbac(subscription_id=ctx.subscription_id, settings=ctx.settings)
+        ctx.result.rbac_roles = roles
+        logger.info("Default RBAC roles assigned for subscription %s", ctx.subscription_id)
+    except Exception as exc:  # noqa: BLE001
+        ctx.result.errors.append(f"RBAC creation failed: {exc}")
+        logger.exception("Failed to assign default RBAC roles")
+
+
+@register_step(depends_on=[STEP_RBAC])
+async def STEP_POLICY(ctx: StepContext) -> None:
+    """Step 4 — Assign default Azure policies."""
+    if ctx.dry_run:
+        logger.info("DRY RUN: would assign default policies for subscription %s", ctx.subscription_id)
+        return
+    try:
+        await assign_default_policies(subscription_id=ctx.subscription_id, settings=ctx.settings)
+        logger.info("Default policies assigned for subscription %s", ctx.subscription_id)
+    except Exception as exc:  # noqa: BLE001
+        ctx.result.errors.append(f"Policy assignment failed: {exc}")
+        logger.exception("Failed to assign default policies")
+
+
+@register_step(depends_on=[STEP_POLICY])
+async def STEP_BUDGET(ctx: StepContext) -> None:
+    """Step 5 — Create monthly cost budget alert (conditional on itl-budget tag)."""
+    if ctx.config.budget_eur <= 0:
+        return
+    if ctx.dry_run:
+        logger.info(
+            "DRY RUN: would create budget alert for subscription %s (amount=%d EUR)",
+            ctx.subscription_id,
+            ctx.config.budget_eur,
+        )
+        return
+    try:
+        contact_email = ctx.config.owner_email or ctx.settings.default_alert_email
+        await _create_budget_alert(
+            credential=ctx.credential,
+            subscription_id=ctx.subscription_id,
+            amount=ctx.config.budget_eur,
+            contact_email=contact_email,
+        )
+        logger.info(
+            "Budget alert created for subscription %s (amount=%d EUR, contact=%s)",
+            ctx.subscription_id,
+            ctx.config.budget_eur,
+            contact_email,
+        )
+    except Exception as exc:  # noqa: BLE001
+        ctx.result.errors.append(f"Budget alert failed: {exc}")
+        logger.exception("Failed to create budget alert for subscription %s", ctx.subscription_id)
+
+
+@register_step(depends_on=[STEP_BUDGET])
+async def STEP_NOTIFY(ctx: StepContext) -> None:
+    """Step 6 — Publish outbound SubscriptionProvisioned event (conditional)."""
+    if ctx.dry_run:
+        logger.info("DRY RUN: would publish provisioned event for subscription %s", ctx.subscription_id)
+        return
+    await publish_provisioned_event(
+        result=ctx.result,
+        subscription_name=ctx.subscription_name,
+        settings=ctx.settings,
+    )
+
+
 async def run_provisioning_workflow(
     subscription_id: str,
     subscription_name: str,
@@ -156,16 +289,22 @@ async def run_provisioning_workflow(
     """
     Execute the provisioning workflow for a new subscription.
 
-    Steps:
-      0. Read subscription tags to derive provisioning configuration.
-      1. Move the subscription under the tag-determined management group
-         (falls back to *management_group_id* or ``settings.root_management_group``).
-      2. Attach the ITL Foundation Initiative to the subscription.
-      3. Assign default RBAC roles.
-      4. Assign default policies.
-      5. Create a cost budget alert when the ``itl-budget`` tag is present.
+    Step 0 (preamble) reads subscription tags to build the :class:`StepContext`.
+    All subsequent steps — built-in (:data:`STEP_MG` → :data:`STEP_NOTIFY`) and
+    any custom steps registered via :func:`register_step` or
+    :meth:`~core.base.BaseStep.register` — run through a shared topological
+    sort driven by ``depends_on`` declarations.
 
-    Returns a :class:`ProvisioningResult` summarising the outcome of each step.
+    To insert a custom step *between* two built-in steps import the relevant
+    step constant and use it as a dependency::
+
+        from subscription_vending.workflow import STEP_RBAC, STEP_POLICY
+
+        @register_step(depends_on=[STEP_RBAC])
+        async def my_step(ctx: StepContext) -> None:
+            ...  # runs after RBAC, before policy
+
+    Returns a :class:`ProvisioningResult` summarising the outcome.
     """
     result = ProvisioningResult(subscription_id=subscription_id, dry_run=dry_run)
 
@@ -176,7 +315,7 @@ async def run_provisioning_workflow(
         " [DRY RUN]" if dry_run else "",
     )
 
-    # Step 0 — Read subscription tags
+    # Step 0 — Read subscription tags (preamble: builds StepContext)
     from .azure.management_groups import _get_credential  # noqa: PLC0415
 
     if dry_run:
@@ -187,102 +326,6 @@ async def run_provisioning_workflow(
         credential = _get_credential(settings)
         config = await read_subscription_config(credential, subscription_id, settings)
 
-    # Step 1 — Management group placement
-    # Prefer the tag-derived MG; fall back to the caller-supplied value or the
-    # root MG configured in settings.
-    mg_id = config.management_group_name or management_group_id or settings.root_management_group
-    if dry_run:
-        logger.info("DRY RUN: would move subscription %s to management group %s", subscription_id, mg_id)
-        result.management_group = mg_id
-    else:
-        try:
-            await move_subscription_to_management_group(
-                subscription_id=subscription_id,
-                management_group_id=mg_id,
-                settings=settings,
-            )
-            result.management_group = mg_id
-            logger.info("Subscription %s moved to management group %s", subscription_id, mg_id)
-        except Exception as exc:  # noqa: BLE001
-            result.errors.append(f"MG assignment failed: {exc}")
-            logger.exception("Failed to move subscription to management group")
-
-    # Step 2 — Attach foundation initiative
-    if dry_run:
-        logger.info("DRY RUN: would attach foundation initiative for subscription %s", subscription_id)
-    else:
-        try:
-            initiative_id = await attach_foundation_initiative(
-                authorization_url=settings.authorization_service_url,
-                subscription_id=subscription_id,
-            )
-            result.initiative_id = initiative_id
-            logger.info("Foundation initiative attached for subscription %s: %s", subscription_id, initiative_id)
-        except Exception as exc:  # noqa: BLE001
-            result.errors.append(f"Foundation initiative failed: {exc}")
-            logger.exception("Failed to attach foundation initiative")
-
-    # Step 3 — RBAC role assignments
-    if dry_run:
-        logger.info("DRY RUN: would assign default RBAC roles for subscription %s", subscription_id)
-    else:
-        try:
-            roles = await create_initial_rbac(subscription_id=subscription_id, settings=settings)
-            result.rbac_roles = roles
-            logger.info("Default RBAC roles assigned for subscription %s", subscription_id)
-        except Exception as exc:  # noqa: BLE001
-            result.errors.append(f"RBAC creation failed: {exc}")
-            logger.exception("Failed to assign default RBAC roles")
-
-    # Step 4 — Policy assignments
-    if dry_run:
-        logger.info("DRY RUN: would assign default policies for subscription %s", subscription_id)
-    else:
-        try:
-            await assign_default_policies(subscription_id=subscription_id, settings=settings)
-            logger.info("Default policies assigned for subscription %s", subscription_id)
-        except Exception as exc:  # noqa: BLE001
-            result.errors.append(f"Policy assignment failed: {exc}")
-            logger.exception("Failed to assign default policies")
-
-    # Step 5 — Cost budget alert (only when itl-budget tag is set)
-    if config.budget_eur > 0:
-        if dry_run:
-            logger.info(
-                "DRY RUN: would create budget alert for subscription %s (amount=%d EUR)",
-                subscription_id,
-                config.budget_eur,
-            )
-        else:
-            try:
-                contact_email = config.owner_email or settings.default_alert_email
-                await _create_budget_alert(
-                    credential=credential,
-                    subscription_id=subscription_id,
-                    amount=config.budget_eur,
-                    contact_email=contact_email,
-                )
-                logger.info(
-                    "Budget alert created for subscription %s (amount=%d EUR, contact=%s)",
-                    subscription_id,
-                    config.budget_eur,
-                    contact_email,
-                )
-            except Exception as exc:  # noqa: BLE001
-                result.errors.append(f"Budget alert failed: {exc}")
-                logger.exception("Failed to create budget alert for subscription %s", subscription_id)
-
-    # Step 6 — Publish outbound notification event (non-fatal)
-    if dry_run:
-        logger.info("DRY RUN: would publish provisioned event for subscription %s", subscription_id)
-    else:
-        await publish_provisioned_event(
-            result=result,
-            subscription_name=subscription_name,
-            settings=settings,
-        )
-
-    # Custom steps — registered via @register_step, executed in dependency order
     ctx = StepContext(
         subscription_id=subscription_id,
         subscription_name=subscription_name,
@@ -290,6 +333,8 @@ async def run_provisioning_workflow(
         settings=settings,
         result=result,
         dry_run=dry_run,
+        credential=credential,
+        event_management_group_id=management_group_id,
     )
 
     await emit(LifecycleEvent.PROVISIONING_STARTED, ctx)
@@ -298,16 +343,17 @@ async def run_provisioning_workflow(
         try:
             ordered_steps = _toposort(_EXTRA_STEPS)
         except ValueError as exc:
-            result.errors.append(f"Custom step ordering failed: {exc}")
-            logger.exception("Failed to resolve custom workflow step order")
+            result.errors.append(f"Step ordering failed: {exc}")
+            logger.exception("Failed to resolve workflow step order")
             ordered_steps = []
         for step in ordered_steps:
+            _step_name = getattr(step, "__qualname__", type(step).__qualname__)
             try:
-                logger.info("Running custom workflow step: %s", step.__qualname__)
+                logger.info("Running workflow step: %s", _step_name)
                 await step(ctx)
             except Exception as exc:  # noqa: BLE001
-                result.errors.append(f"Custom step '{step.__qualname__}' failed: {exc}")
-                logger.exception("Custom workflow step %s failed", step.__qualname__)
+                result.errors.append(f"Step '{_step_name}' failed: {exc}")
+                logger.exception("Workflow step %s failed", _step_name)
 
     # Lifecycle events — fire after all steps
     await emit(LifecycleEvent.PROVISIONING_COMPLETED, ctx)

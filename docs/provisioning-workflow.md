@@ -5,7 +5,30 @@ title: Provisioning Workflow
 
 # Provisioning Workflow
 
-When the service receives a `Microsoft.Resources.ResourceActionSuccess` event for a `Microsoft.Subscription/aliases/write` operation, it executes the following workflow for the new subscription (Steps 0–6). Each step is independent — a failure in one step is logged but does not stop subsequent steps.
+When the service receives a `Microsoft.Resources.ResourceActionSuccess` event for a `Microsoft.Subscription/aliases/write` operation, it executes the following workflow for the new subscription. Each step is independent — a failure in one step is logged and recorded in `result.errors`, but does not stop subsequent steps.
+
+All steps — built-in (Steps 1–6) **and** custom steps from `extensions/` — run through a shared topological sort driven by `depends_on` declarations. This means you can insert a custom step between any two built-in steps by referencing the relevant step constant:
+
+```python
+from subscription_vending.workflow import STEP_RBAC, register_step, StepContext
+
+@register_step(depends_on=[STEP_RBAC])   # runs after RBAC, before policy
+async def my_step(ctx: StepContext) -> None:
+    ...
+```
+
+### Step constants
+
+| Constant | Step | Import from |
+|----------|------|--------------|
+| `STEP_MG` | Management group placement | `subscription_vending.workflow` |
+| `STEP_INITIATIVE` | Attach Foundation Initiative | `subscription_vending.workflow` |
+| `STEP_RBAC` | RBAC role assignments | `subscription_vending.workflow` |
+| `STEP_POLICY` | Policy assignments | `subscription_vending.workflow` |
+| `STEP_BUDGET` | Budget alert | `subscription_vending.workflow` |
+| `STEP_NOTIFY` | Outbound event publish | `subscription_vending.workflow` |
+
+All constants are also re-exported from `subscription_vending` directly.
 
 ---
 
@@ -173,8 +196,7 @@ Create a `.py` file in `src/subscription_vending/extensions/`. It is picked up a
 ```python
 # extensions/my_step.py
 from __future__ import annotations
-import os
-from ..workflow import StepContext
+from ..workflow import StepContext, STEP_NOTIFY
 from ..core.base import BaseStep
 
 class MyStep(BaseStep):
@@ -183,9 +205,11 @@ class MyStep(BaseStep):
         # ctx.config  — SubscriptionConfig (environment, budget, owner, …)
         # ctx.settings — VENDING_* env-var config
         # ctx.result  — append to ctx.result.errors on failure
+        # ctx.dry_run — True when no Azure/HTTP calls should be made
         ...
 
-MyStep().register()
+# Runs last, after the built-in outbound notification
+MyStep().register(depends_on=[STEP_NOTIFY])
 ```
 
 ### Step ordering with `depends_on`
