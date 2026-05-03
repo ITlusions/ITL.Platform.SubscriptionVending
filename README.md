@@ -34,6 +34,7 @@ See [docs/provisioning-workflow.md](./docs/provisioning-workflow.md) for full de
 
 > **Documentation site:** [itlusions.github.io/ITL.Platform.SubscriptionVending](https://itlusions.github.io/ITL.Platform.SubscriptionVending/)
 >
+> - [Live Demo — automated walkthrough](https://itlusions.github.io/ITL.Platform.SubscriptionVending/demo.html)
 > - [Architecture overview](https://itlusions.github.io/ITL.Platform.SubscriptionVending/architecture)
 > - [Configuration reference](https://itlusions.github.io/ITL.Platform.SubscriptionVending/configuration)
 > - [Secrets handling](https://itlusions.github.io/ITL.Platform.SubscriptionVending/secrets)
