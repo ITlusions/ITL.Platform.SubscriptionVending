@@ -82,16 +82,8 @@ class ServiceNowCheckGate:
             )
             return
 
-        if ctx.dry_run:
-            import logging  # noqa: PLC0415
-            logging.getLogger(__name__).info(
-                "[dry_run] Would validate ServiceNow ticket %r against %s/%s",
-                ticket,
-                self.instance,
-                self.table,
-            )
-            return
-
+        # Checking a ticket is a read-only operation — always run, even in dry_run.
+        # This gives accurate preflight feedback about whether provisioning would be gated.
         url = f"https://{self.instance}/api/now/table/{self.table}"
         params = {
             "sysparm_query": f"number={ticket}",
@@ -141,6 +133,11 @@ class ServiceNowCheckGate:
             ticket,
             self.table,
             record.get("approval", ""),
+        )
+        ctx.result.plan.append(
+            f"[SNOW gate] Ticket {ticket!r} validated — "
+            f"approval={record.get('approval', '')!r}, "
+            f"description={record.get('short_description', '')!r}"
         )
 
     def register(self) -> "ServiceNowCheckGate":

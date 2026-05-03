@@ -110,6 +110,17 @@ class ServiceNowFeedbackStep:
                 ticket,
                 succeeded,
             )
+            if succeeded:
+                ctx.result.plan.append(
+                    f"[SNOW feedback] Would post 'Provisioning completed successfully' "
+                    f"to ticket {ticket!r}"
+                    + (f" and set state to '{self.success_state}'" if self.success_state else "")
+                )
+            else:
+                ctx.result.plan.append(
+                    f"[SNOW feedback] Would post error summary to ticket {ticket!r}"
+                    + (f" and set state to '{self.failure_state}'" if self.failure_state else "")
+                )
             return
 
         # Build work_notes message

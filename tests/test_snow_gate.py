@@ -255,19 +255,37 @@ async def test_snow_gate_fails_when_no_ticket_on_subscription():
 
 
 @pytest.mark.asyncio
-async def test_snow_gate_dry_run_skips_http_call():
-    """In dry-run mode the gate logs and returns without calling ServiceNow."""
-    import httpx  # noqa: PLC0415
+async def test_snow_gate_dry_run_still_validates_ticket():
+    """In dry_run mode the gate still calls ServiceNow (read-only check).
+
+    The gate is a validation step, not a mutation — it should always run so
+    that preflight dry-runs give accurate feedback about whether the ticket
+    is present and approved.
+    """
     from subscription_vending.extensions._servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
 
     gate = ServiceNowCheckGate(instance="myco.service-now.com", user="u", password="p")
     ctx = _make_ctx(snow_ticket="RITM0001234", dry_run=True)
 
-    with patch("httpx.AsyncClient") as mock_client:
-        await gate(ctx)
-        mock_client.assert_not_called()
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json.return_value = {
+        "result": [{"number": "RITM0001234", "approval": "approved", "short_description": "Phoenix prod"}]
+    }
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_resp)
 
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        await gate(ctx)
+
+    # HTTP call was made even in dry_run
+    mock_client.get.assert_awaited_once()
+    # No errors — ticket was approved
     assert ctx.result.errors == []
+    # Plan entry written
+    assert any("RITM0001234" in p for p in ctx.result.plan)
 
 
 @pytest.mark.asyncio

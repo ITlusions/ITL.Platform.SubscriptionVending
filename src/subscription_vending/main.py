@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from .config import Settings
 from .handlers.event_grid import router as event_grid_router
 from .handlers.mock import router as mock_router
+from .handlers.preflight import router as preflight_router
 from .extensions import autodiscover
 
 settings = Settings()
@@ -21,6 +22,7 @@ app = FastAPI(
 )
 
 app.include_router(event_grid_router)
+app.include_router(preflight_router)
 if settings.mock_mode:
     app.include_router(mock_router)
 

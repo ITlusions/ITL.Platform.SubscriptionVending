@@ -192,6 +192,7 @@ class ProvisioningResult:
     initiative_id:    str = ""
     rbac_roles:       list[str] = field(default_factory=list)
     errors:           list[str] = field(default_factory=list)
+    plan:             list[str] = field(default_factory=list)
     dry_run:          bool = False
 
     @property
@@ -219,6 +220,7 @@ async def STEP_MG(ctx: StepContext) -> None:
     if ctx.dry_run:
         logger.info("DRY RUN: would move subscription %s to management group %s", ctx.subscription_id, mg_id)
         ctx.result.management_group = mg_id
+        ctx.result.plan.append(f"[STEP_MG] Move subscription to management group '{mg_id}'")
         return
     try:
         await move_subscription_to_management_group(
@@ -238,6 +240,7 @@ async def STEP_INITIATIVE(ctx: StepContext) -> None:
     """Step 2 — Attach the ITL Foundation Policy Initiative."""
     if ctx.dry_run:
         logger.info("DRY RUN: would attach foundation initiative for subscription %s", ctx.subscription_id)
+        ctx.result.plan.append("[STEP_INITIATIVE] Attach ITL Foundation Policy Initiative")
         return
     try:
         initiative_id = await attach_foundation_initiative(
@@ -256,6 +259,7 @@ async def STEP_RBAC(ctx: StepContext) -> None:
     """Step 3 — Assign default RBAC roles."""
     if ctx.dry_run:
         logger.info("DRY RUN: would assign default RBAC roles for subscription %s", ctx.subscription_id)
+        ctx.result.plan.append("[STEP_RBAC] Assign default RBAC roles (Platform SPN, Ops, Security, FinOps)")
         return
     try:
         roles = await create_initial_rbac(subscription_id=ctx.subscription_id, settings=ctx.settings)
@@ -271,6 +275,7 @@ async def STEP_POLICY(ctx: StepContext) -> None:
     """Step 4 — Assign default Azure policies."""
     if ctx.dry_run:
         logger.info("DRY RUN: would assign default policies for subscription %s", ctx.subscription_id)
+        ctx.result.plan.append("[STEP_POLICY] Assign default Azure policies")
         return
     try:
         await assign_default_policies(subscription_id=ctx.subscription_id, settings=ctx.settings)
@@ -284,12 +289,19 @@ async def STEP_POLICY(ctx: StepContext) -> None:
 async def STEP_BUDGET(ctx: StepContext) -> None:
     """Step 5 — Create monthly cost budget alert (conditional on itl-budget tag)."""
     if ctx.config.budget_eur <= 0:
+        if ctx.dry_run:
+            ctx.result.plan.append("[STEP_BUDGET] Skipped — no itl-budget tag on subscription")
         return
     if ctx.dry_run:
+        contact_email = ctx.config.owner_email or ctx.settings.default_alert_email
         logger.info(
             "DRY RUN: would create budget alert for subscription %s (amount=%d EUR)",
             ctx.subscription_id,
             ctx.config.budget_eur,
+        )
+        ctx.result.plan.append(
+            f"[STEP_BUDGET] Create monthly budget alert — "
+            f"€{ctx.config.budget_eur}/month, notify {contact_email or '(no email set)'}"
         )
         return
     try:
@@ -316,6 +328,7 @@ async def STEP_NOTIFY(ctx: StepContext) -> None:
     """Step 6 — Publish outbound SubscriptionProvisioned event (conditional)."""
     if ctx.dry_run:
         logger.info("DRY RUN: would publish provisioned event for subscription %s", ctx.subscription_id)
+        ctx.result.plan.append("[STEP_NOTIFY] Publish SubscriptionProvisioned event to Event Grid")
         return
     await publish_provisioned_event(
         result=ctx.result,
