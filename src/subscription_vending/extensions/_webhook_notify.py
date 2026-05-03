@@ -13,15 +13,12 @@ Register this extension in main.py::
 
 from __future__ import annotations
 
-import logging
 import os
 
 import httpx
 
 from ..workflow import StepContext
 from ..core.base import BaseStep
-
-logger = logging.getLogger(__name__)
 
 
 class WebhookNotifyStep(BaseStep):
@@ -50,15 +47,15 @@ class WebhookNotifyStep(BaseStep):
                     self.url, json=self._build_payload(ctx), headers=headers
                 )
                 response.raise_for_status()
-                logger.info("WebhookNotifyStep: POST %s -> %s", self.url, response.status_code)
+                self.logger.info("WebhookNotifyStep: POST %s -> %s", self.url, response.status_code)
         except httpx.HTTPStatusError as exc:
             ctx.result.errors.append(
                 f"WebhookNotifyStep: server returned {exc.response.status_code}"
             )
-            logger.error("WebhookNotifyStep: HTTP error %s", exc)
+            self.logger.error("WebhookNotifyStep: HTTP error %s", exc)
         except httpx.RequestError as exc:
             ctx.result.errors.append(f"WebhookNotifyStep: request failed - {exc}")
-            logger.error("WebhookNotifyStep: request error %s", exc)
+            self.logger.error("WebhookNotifyStep: request error %s", exc)
 
 
 # Auto-register when this module is imported.

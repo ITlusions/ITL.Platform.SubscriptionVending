@@ -27,18 +27,22 @@ from abc import ABC, abstractmethod
 
 from ..workflow import StepContext, WorkflowStep, register_step
 
-logger = logging.getLogger(__name__)
-
 
 class BaseStep(ABC):
     """Abstract base for all custom provisioning steps.
 
     Provides:
 
+    - ``logger``              -- per-class logger named after the subclass module
     - ``_build_payload(ctx)`` -- standard provisioning result dict shared by all steps
     - ``__call__``            -- wraps ``execute()`` with catch-all error recording
     - ``register()``          -- registers this instance with the workflow
     """
+
+    @property
+    def logger(self) -> logging.Logger:
+        """Logger named after the concrete subclass module and class."""
+        return logging.getLogger(f"{type(self).__module__}.{type(self).__qualname__}")
 
     def _build_payload(self, ctx: StepContext) -> dict:
         """Return the standard provisioning result payload."""
@@ -67,7 +71,7 @@ class BaseStep(ABC):
         except Exception as exc:  # noqa: BLE001
             name = type(self).__name__
             ctx.result.errors.append(f"{name} failed: {exc}")
-            logger.exception("%s raised an unhandled exception", name)
+            self.logger.exception("%s raised an unhandled exception", name)
 
     def register(
         self,

@@ -13,15 +13,12 @@ Register this extension in main.py::
 
 from __future__ import annotations
 
-import logging
 import os
 
 import httpx
 
 from ..workflow import StepContext
 from ..core.base import BaseStep
-
-logger = logging.getLogger(__name__)
 
 
 class ApiNotifyStep(BaseStep):
@@ -34,7 +31,7 @@ class ApiNotifyStep(BaseStep):
 
     async def execute(self, ctx: StepContext) -> None:
         if not self.url:
-            logger.debug("ApiNotifyStep: URL not configured, skipping")
+            self.logger.debug("ApiNotifyStep: URL not configured, skipping")
             return
 
         headers: dict[str, str] = {"Content-Type": "application/json"}
@@ -47,15 +44,15 @@ class ApiNotifyStep(BaseStep):
                     self.url, json=self._build_payload(ctx), headers=headers
                 )
                 response.raise_for_status()
-                logger.info("ApiNotifyStep: POST %s -> %s", self.url, response.status_code)
+                self.logger.info("ApiNotifyStep: POST %s -> %s", self.url, response.status_code)
         except httpx.HTTPStatusError as exc:
             ctx.result.errors.append(
                 f"ApiNotifyStep: server returned {exc.response.status_code}"
             )
-            logger.error("ApiNotifyStep: HTTP error %s", exc)
+            self.logger.error("ApiNotifyStep: HTTP error %s", exc)
         except httpx.RequestError as exc:
             ctx.result.errors.append(f"ApiNotifyStep: request failed - {exc}")
-            logger.error("ApiNotifyStep: request error %s", exc)
+            self.logger.error("ApiNotifyStep: request error %s", exc)
 
 
 # Auto-register when this module is imported.
