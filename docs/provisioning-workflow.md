@@ -17,12 +17,17 @@ A failure in a provisioning step is logged and recorded in `result.errors` by de
 All steps — built-in (Steps 1–6) **and** custom steps from `extensions/` — run through a shared topological sort driven by `depends_on` declarations. This means you can insert a custom step between any two built-in steps by referencing the relevant step constant:
 
 ```python
-from subscription_vending.workflow import STEP_RBAC, register_step, StepContext
+from subscription_vending.core.registry import register_step
+from subscription_vending.domain.context import StepContext
+from subscription_vending.workflow import STEP_RBAC
 
 @register_step(depends_on=[STEP_RBAC])   # runs after RBAC, before policy
 async def my_step(ctx: StepContext) -> None:
     ...
 ```
+
+> `workflow.py` re-exports `register_step`, `register_gate`, and `StepContext` for backward compatibility.
+> New code should import from `core.registry` and `domain.context` directly.
 
 ### Step constants
 
@@ -46,7 +51,8 @@ Gate checks run **before Step 0** and before any Azure mutation. They are ideal 
 A gate check is registered with `register_gate`. By default `stop_on_error=True`, meaning a failing gate aborts the entire workflow immediately.
 
 ```python
-from subscription_vending.workflow import register_gate, StepContext
+from subscription_vending.core.registry import register_gate
+from subscription_vending.domain.context import StepContext
 
 @register_gate
 async def require_snow_ticket(ctx: StepContext) -> None:

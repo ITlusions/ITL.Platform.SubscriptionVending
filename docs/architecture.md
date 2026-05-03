@@ -39,6 +39,46 @@ ITL Subscription Vending  (POST /webhook/)
 
 ---
 
+## Internal architecture
+
+The service is designed as a **Microkernel / Plugin pipeline engine**. The core framework is fixed; all provisioning logic is pluggable.
+
+```
+handlers/          driving adapters (FastAPI routers)
+     │
+retry/dispatcher   strategy: none / queue / dead_letter
+     │
+workflow.py        orchestrator — built-in steps 1–6 + toposort
+     │
+core/registry.py   step + gate registries
+     │
+core/base.py       BaseStep ABC — plugin contract
+     │
+domain/            pure domain objects (StepContext, ProvisioningResult)
+     │
+azure/             Azure SDK adapters
+     │
+core/events.py     lifecycle bus: STARTED / COMPLETED / SUCCEEDED / FAILED
+     │
+extensions/        auto-discovered plugins
+```
+
+### Layer responsibilities
+
+| Layer / folder | Responsibility |
+|---|---|
+| `domain/` | Pure domain objects. No I/O, no framework imports. |
+| `core/` | Framework skeleton: `BaseStep` ABC, step registry, lifecycle event bus, port contracts (`protocols.py`), exception hierarchy (`exceptions.py`). No business logic. |
+| `schemas/` | Pydantic HTTP surface contracts. Only imported by `handlers/`. |
+| `azure/` | All Azure SDK calls. No workflow orchestration. |
+| `extensions/` | Auto-discovered plugins. Each module self-registers at import. |
+| `handlers/` | FastAPI routers (webhook, worker, preflight, replay, mock). |
+| `retry/` | Retry strategy: inline (`none`), Azure Storage Queue (`queue`), dead-letter (`dead_letter`). |
+| `config.py` | All settings via `Pydantic BaseSettings`. Use `get_settings()` — never instantiate `Settings()` directly. |
+| `workflow.py` | Orchestrator for built-in steps 1–6. Re-exports `StepContext`, `register_step`, `register_gate` for backward compatibility. |
+
+---
+
 ## Component breakdown
 
 ### FastAPI application (`src/subscription_vending/`)
@@ -46,13 +86,18 @@ ITL Subscription Vending  (POST /webhook/)
 | Module | Responsibility |
 |--------|---------------|
 | `main.py` | Application factory; mounts routers; exposes `/health`; calls `autodiscover()` |
-| `config.py` | Pydantic-settings `Settings` class; loads `VENDING_*` env vars |
-| `models.py` | Pydantic request/response models for Event Grid and webhooks |
-| `workflow.py` | Orchestrates the provisioning workflow (steps 0–6 + custom steps + lifecycle events) |
-| `handlers/event_grid.py` | `POST /webhook/` — receives Event Grid deliveries, validates SAS key, dispatches to workflow |
-| `handlers/mock.py` | `POST /webhook/test` — mock endpoint (enabled when `VENDING_MOCK_MODE=true`) |
+| `config.py` | Pydantic-settings `Settings` class; `get_settings()` singleton (`@lru_cache`); loads `VENDING_*` env vars |
+| `models.py` | Backward-compatible re-export shim — delegates to `schemas/event_grid.py`; deprecated for new code |
+| `workflow.py` | Orchestrates the provisioning workflow (built-in steps 1–6 + custom steps + lifecycle events); re-exports domain and registry symbols |
+| `domain/context.py` | `StepContext` and `ProvisioningResult` — pure domain dataclasses with no I/O or framework dependencies |
 | `core/base.py` | `BaseStep` ABC — base class for all custom provisioning steps |
 | `core/events.py` | Lifecycle event bus — `LifecycleEvent`, `on()`, `emit()` |
+| `core/registry.py` | Step and gate registries (`_EXTRA_STEPS`, `_GATE_STEPS`), `register_step()`, `register_gate()`, `toposort()` |
+| `core/protocols.py` | Port contracts: `ManagementGroupPort`, `RbacPort`, `PolicyPort`, `NotificationPort`, `TagReaderPort` — all `@runtime_checkable Protocol` |
+| `core/exceptions.py` | Typed exception hierarchy: `AppError → ProvisioningError` (`GateCheckFailed`, `StepFailed`) `\| AzureIntegrationError` (`ManagementGroupError`, `RbacError`, `PolicyError`, `NotificationError`) `\| ConfigurationError \| AuthorizationError` |
+| `schemas/event_grid.py` | HTTP surface contracts: `EventGridEvent`, `EventGridEventData`, `WebhookResponse`, `HealthResponse` |
+| `handlers/event_grid.py` | `POST /webhook/` — receives Event Grid deliveries, validates SAS key, dispatches to workflow |
+| `handlers/mock.py` | `POST /webhook/test` — mock endpoint (enabled when `VENDING_MOCK_MODE=true`) |
 | `extensions/` | Auto-discovered extension modules; each registers steps or event handlers at import time |
 | `extensions/_webhook_notify.py` | Built-in step: POST result to a plain HTTPS webhook |
 | `extensions/_api_notify.py` | Built-in step: POST result to a REST API with Bearer token auth |

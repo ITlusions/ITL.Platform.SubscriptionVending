@@ -85,9 +85,19 @@ ITL.Platform.SubscriptionVending/
 └── src/
     └── subscription_vending/
         ├── main.py
-        ├── config.py
-        ├── models.py
-        ├── workflow.py
+        ├── config.py          # Settings + get_settings() singleton
+        ├── models.py          # backward-compat re-export (use schemas/ for new code)
+        ├── workflow.py        # orchestrator — built-in steps 1–6
+        ├── domain/
+        │   └── context.py     # StepContext, ProvisioningResult (pure domain)
+        ├── core/
+        │   ├── base.py        # BaseStep ABC
+        │   ├── events.py      # lifecycle event bus
+        │   ├── registry.py    # step + gate registry, toposort
+        │   ├── protocols.py   # Azure port contracts (typing.Protocol)
+        │   └── exceptions.py  # typed exception hierarchy
+        ├── schemas/
+        │   └── event_grid.py  # HTTP request/response schemas (Pydantic)
         ├── handlers/
         │   ├── event_grid.py
         │   ├── mock.py
@@ -103,9 +113,6 @@ ITL.Platform.SubscriptionVending/
         │   ├── _api_notify.py
         │   ├── _servicenow_check.py
         │   └── _servicenow_feedback.py
-        ├── core/
-        │   ├── base.py
-        │   └── events.py
         └── azure/
             ├── management_groups.py
             ├── notifications.py

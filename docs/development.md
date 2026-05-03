@@ -80,7 +80,45 @@ The service is available at <http://localhost:8000>.
 
 ---
 
-## 5. Running with Docker Compose
+## 5. Project layout
+
+```
+src/subscription_vending/
+├── main.py                  application factory, router registration
+├── config.py                Settings (Pydantic) + get_settings() @lru_cache singleton
+├── models.py                backward-compat re-export — use schemas/ for new code
+├── workflow.py              orchestrator: built-in steps 1–6, re-exports domain/core symbols
+│
+├── domain/
+│   └── context.py           StepContext, ProvisioningResult — pure dataclasses, no I/O
+│
+├── core/
+│   ├── base.py              BaseStep ABC — plugin contract
+│   ├── events.py            lifecycle event bus (STARTED / SUCCEEDED / FAILED / COMPLETED)
+│   ├── registry.py          step + gate registries, register_step(), register_gate(), toposort()
+│   ├── protocols.py         Azure port contracts (typing.Protocol, @runtime_checkable)
+│   └── exceptions.py        typed exception hierarchy (AppError → ProvisioningError, etc.)
+│
+├── schemas/
+│   └── event_grid.py        HTTP schemas: EventGridEvent, WebhookResponse, HealthResponse
+│
+├── handlers/                FastAPI routers (driving adapters)
+├── retry/                   retry strategies: none / queue / dead_letter
+├── extensions/              auto-discovered plugins (self-register at import time)
+└── azure/                   Azure SDK calls (management groups, RBAC, policy, tags, notifications)
+```
+
+### Key conventions
+
+- Import `StepContext` / `ProvisioningResult` from `domain.context`; import `register_step` / `register_gate` from `core.registry`. The old `workflow` import paths still work (re-exported) but should not be used in new code.
+- Use `get_settings()` everywhere instead of `Settings()`. The singleton is cached after the first call.
+- New HTTP schemas go in `schemas/` — never in `domain/` or `core/`.
+- New Azure SDK calls go in `azure/` — never in `workflow.py` or `handlers/`.
+- Raise typed exceptions from `core/exceptions.py` rather than appending plain strings to `ctx.result.errors` (the plain-string pattern is still supported for backward compatibility).
+
+---
+
+## 6. Running with Docker Compose
 
 ```bash
 docker-compose up --build
@@ -96,7 +134,7 @@ docker-compose up --build --force-recreate
 
 ---
 
-## 6. Triggering the mock workflow
+## 7. Triggering the mock workflow
 
 With mock mode enabled, you can trigger a full provisioning run without connecting to Azure:
 
@@ -127,7 +165,7 @@ curl -X POST http://localhost:8000/webhook/test \
 
 ---
 
-## 7. Running tests
+## 8. Running tests
 
 ```bash
 pytest
@@ -147,6 +185,18 @@ pytest tests/test_workflow.py -v
 
 The test suite uses `pytest-asyncio` in `auto` mode, so all `async` test functions are automatically treated as async tests.
 
+When patching settings in tests, call `get_settings.cache_clear()` before applying `monkeypatch` env vars:
+
+```python
+from subscription_vending.config import get_settings
+
+def test_something(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("VENDING_AZURE_TENANT_ID", "test-tenant")
+    settings = get_settings()
+    ...
+```
+
 ### Test structure
 
 | File | What it tests |
@@ -154,7 +204,10 @@ The test suite uses `pytest-asyncio` in `auto` mode, so all `async` test functio
 | `tests/test_app.py` | FastAPI application setup; `/health` endpoint |
 | `tests/test_event_grid.py` | Event Grid webhook handler (validation handshake, event parsing, SAS key enforcement) |
 | `tests/test_rbac.py` | RBAC role-assignment helpers |
+| `tests/test_retry.py` | Retry strategy dispatcher and queue client |
+| `tests/test_snow_gate.py` | ServiceNow gate check extension |
 | `tests/test_tags.py` | Subscription tag parsing and `SubscriptionConfig` derivation |
+| `tests/test_notifications.py` | Outbound notification step |
 | `tests/test_workflow.py` | End-to-end provisioning workflow with mocked Azure calls |
 
 ---
