@@ -3,7 +3,8 @@ from fastapi import FastAPI
 from .config import Settings
 from .handlers.event_grid import router as event_grid_router
 from .handlers.mock import router as mock_router
-from .extensions import webhook_notify  # noqa: F401  — registers @register_step
+from .extensions import webhook_notify  # noqa: F401  — registers WebhookNotifyStep
+from .extensions import api_notify      # noqa: F401  — registers ApiNotifyStep
 
 settings = Settings()
 

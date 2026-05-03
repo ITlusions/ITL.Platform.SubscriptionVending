@@ -1,6 +1,6 @@
 """Extension: POST a JSON payload to a webhook after every successful provisioning.
 
-Configuration (environment variables):
+Configuration (environment variables)::
 
     VENDING_WEBHOOK_URL          Required. HTTPS endpoint to POST to.
     VENDING_WEBHOOK_SECRET       Optional. Sent as ``X-Webhook-Secret`` header.
@@ -18,48 +18,52 @@ import os
 
 import httpx
 
-from ..workflow import StepContext, register_step
+from ..workflow import StepContext
+from .base import BaseStep
 
 logger = logging.getLogger(__name__)
 
-_WEBHOOK_URL    = os.getenv("VENDING_WEBHOOK_URL", "")
-_WEBHOOK_SECRET = os.getenv("VENDING_WEBHOOK_SECRET", "")
-_TIMEOUT        = float(os.getenv("VENDING_WEBHOOK_TIMEOUT", "10"))
 
+class WebhookNotifyStep(BaseStep):
+    """POST the provisioning result payload to a plain HTTPS webhook.
 
-@register_step
-async def webhook_notify(ctx: StepContext) -> None:
-    """POST provisioning result to the configured webhook URL."""
-    if not _WEBHOOK_URL:
-        logger.debug("webhook_notify: VENDING_WEBHOOK_URL not set, skipping")
-        return
+    Authentication is via a shared secret sent in ``X-Webhook-Secret``.
+    """
 
-    payload = {
-        "subscription_id":   ctx.subscription_id,
-        "subscription_name": ctx.subscription_name,
-        "environment":       ctx.config.environment,
-        "management_group":  ctx.result.management_group,
-        "rbac_roles":        ctx.result.rbac_roles,
-        "errors":            ctx.result.errors,
-        "success":           len(ctx.result.errors) == 0,
-    }
+    def __init__(self, url: str, secret: str = "", timeout: float = 10.0) -> None:
+        self.url     = url
+        self.secret  = secret
+        self.timeout = timeout
 
-    headers: dict[str, str] = {"Content-Type": "application/json"}
-    if _WEBHOOK_SECRET:
-        headers["X-Webhook-Secret"] = _WEBHOOK_SECRET
+    async def execute(self, ctx: StepContext) -> None:
+        if not self.url:
+            logger.debug("WebhookNotifyStep: URL not configured, skipping")
+            return
 
-    try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            response = await client.post(_WEBHOOK_URL, json=payload, headers=headers)
-            response.raise_for_status()
-            logger.info(
-                "webhook_notify: POST %s → %s", _WEBHOOK_URL, response.status_code
+        headers: dict[str, str] = {"Content-Type": "application/json"}
+        if self.secret:
+            headers["X-Webhook-Secret"] = self.secret
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    self.url, json=self._build_payload(ctx), headers=headers
+                )
+                response.raise_for_status()
+                logger.info("WebhookNotifyStep: POST %s -> %s", self.url, response.status_code)
+        except httpx.HTTPStatusError as exc:
+            ctx.result.errors.append(
+                f"WebhookNotifyStep: server returned {exc.response.status_code}"
             )
-    except httpx.HTTPStatusError as exc:
-        ctx.result.errors.append(
-            f"webhook_notify: server returned {exc.response.status_code}"
-        )
-        logger.error("webhook_notify: HTTP error %s", exc)
-    except httpx.RequestError as exc:
-        ctx.result.errors.append(f"webhook_notify: request failed — {exc}")
-        logger.error("webhook_notify: request error %s", exc)
+            logger.error("WebhookNotifyStep: HTTP error %s", exc)
+        except httpx.RequestError as exc:
+            ctx.result.errors.append(f"WebhookNotifyStep: request failed - {exc}")
+            logger.error("WebhookNotifyStep: request error %s", exc)
+
+
+# Auto-register when this module is imported.
+WebhookNotifyStep(
+    url=os.getenv("VENDING_WEBHOOK_URL", ""),
+    secret=os.getenv("VENDING_WEBHOOK_SECRET", ""),
+    timeout=float(os.getenv("VENDING_WEBHOOK_TIMEOUT", "10")),
+).register()

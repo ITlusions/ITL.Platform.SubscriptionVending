@@ -1,10 +1,13 @@
 """Built-in provisioning workflow extensions.
 
 Import the ones you want to activate in ``main.py``.  Each module
-self-registers via ``@register_step`` on import.
+self-registers on import via ``.register()``.
 
 Available extensions:
 
-    webhook_notify   — POST provisioning result to an HTTPS webhook.
-                       Requires VENDING_WEBHOOK_URL env var.
+    base            — BaseStep ABC; inherit to create custom steps.
+    webhook_notify  — POST result to an HTTPS webhook (X-Webhook-Secret auth).
+                      Requires VENDING_WEBHOOK_URL.
+    api_notify      — POST result to a REST API (Bearer token auth).
+                      Requires VENDING_API_NOTIFY_URL.
 """
