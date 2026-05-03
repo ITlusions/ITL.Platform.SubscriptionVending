@@ -32,7 +32,9 @@ ITL Subscription Vending  (POST /webhook/)
      ├─ 3. Create RBAC role assignments
      ├─ 4. Assign default Azure Policies
      ├─ 5. Create cost-budget alert  (if itl-budget tag present)
-     └─ 6. Publish outbound notification event  (if VENDING_EVENT_GRID_TOPIC_ENDPOINT set)
+     ├─ 6. Publish outbound notification event  (if VENDING_EVENT_GRID_TOPIC_ENDPOINT set)
+     ├─ [Custom steps — auto-discovered from extensions/, topologically ordered]
+     └─ [Lifecycle events — STARTED / COMPLETED / SUCCEEDED / FAILED]
 ```
 
 ---
@@ -43,12 +45,17 @@ ITL Subscription Vending  (POST /webhook/)
 
 | Module | Responsibility |
 |--------|---------------|
-| `main.py` | Application factory; mounts routers; exposes `/health` |
+| `main.py` | Application factory; mounts routers; exposes `/health`; calls `autodiscover()` |
 | `config.py` | Pydantic-settings `Settings` class; loads `VENDING_*` env vars |
 | `models.py` | Pydantic request/response models for Event Grid and webhooks |
-| `workflow.py` | Orchestrates the six-step provisioning workflow |
+| `workflow.py` | Orchestrates the provisioning workflow (steps 0–6 + custom steps + lifecycle events) |
 | `handlers/event_grid.py` | `POST /webhook/` — receives Event Grid deliveries, validates SAS key, dispatches to workflow |
 | `handlers/mock.py` | `POST /webhook/test` — mock endpoint (enabled when `VENDING_MOCK_MODE=true`) |
+| `core/base.py` | `BaseStep` ABC — base class for all custom provisioning steps |
+| `core/events.py` | Lifecycle event bus — `LifecycleEvent`, `on()`, `emit()` |
+| `extensions/` | Auto-discovered extension modules; each registers steps or event handlers at import time |
+| `extensions/_webhook_notify.py` | Built-in step: POST result to a plain HTTPS webhook |
+| `extensions/_api_notify.py` | Built-in step: POST result to a REST API with Bearer token auth |
 | `azure/management_groups.py` | Moves a subscription under a target management group |
 | `azure/notifications.py` | Publishes an outbound `ITL.SubscriptionVending.SubscriptionProvisioned` event to an Azure Event Grid Custom Topic after each provisioning workflow run (Step 6). Enabled only when `VENDING_EVENT_GRID_TOPIC_ENDPOINT` is set. |
 | `azure/rbac.py` | Creates initial RBAC role assignments on the subscription scope |

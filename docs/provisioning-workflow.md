@@ -158,3 +158,111 @@ The workflow returns a `ProvisioningResult` object with the following fields:
 | `success` | `bool` *(property)* | `True` when `errors` is empty |
 
 All results are logged at `INFO` level. Errors are additionally logged at `ERROR` level with full stack traces.
+
+---
+
+## Custom steps
+
+After Step 6, the workflow executes any **custom steps** registered via `@register_step` or `BaseStep.register()`. Steps run in topological order based on their `depends_on` declarations. A failure in one custom step is recorded in `result.errors` but never prevents remaining steps from running.
+
+### Writing a custom step
+
+Create a `.py` file in `src/subscription_vending/extensions/`. It is picked up automatically at startup — no edits to `main.py` needed.
+
+```python
+# extensions/my_step.py
+from __future__ import annotations
+import os
+from ..workflow import StepContext
+from ..core.base import BaseStep
+
+class MyStep(BaseStep):
+    async def execute(self, ctx: StepContext) -> None:
+        # ctx.subscription_id, ctx.subscription_name
+        # ctx.config  — SubscriptionConfig (environment, budget, owner, …)
+        # ctx.settings — VENDING_* env-var config
+        # ctx.result  — append to ctx.result.errors on failure
+        ...
+
+MyStep().register()
+```
+
+### Step ordering with `depends_on`
+
+Steps may declare dependencies on other custom steps. The scheduler runs a topological sort before execution:
+
+```python
+step_a = StepA().register()
+StepB().register(depends_on=[step_a])  # always runs after step_a
+```
+
+A cycle or unregistered dependency is non-fatal: it is recorded in `result.errors` and no custom steps run that invocation.
+
+### Built-in helpers provided by `BaseStep`
+
+| Helper | Description |
+|--------|-------------|
+| `self.logger` | Per-class `logging.Logger` scoped to the subclass |
+| `self._build_payload(ctx)` | Returns the standard provisioning result dict |
+| `self._http_post(ctx, url, headers, timeout)` | POSTs the payload as JSON; catches HTTP/network errors into `result.errors` |
+
+---
+
+## Built-in extensions
+
+Two extensions ship in the `extensions/` package and are auto-discovered:
+
+### `_webhook_notify.py` — plain HTTPS webhook
+
+POSTs the provisioning result to a plain HTTPS endpoint authenticated by a shared secret header.
+
+| Env var | Required | Description |
+|---------|----------|-------------|
+| `VENDING_WEBHOOK_URL` | Yes | HTTPS endpoint to POST to |
+| `VENDING_WEBHOOK_SECRET` | No | Sent as `X-Webhook-Secret` header |
+| `VENDING_WEBHOOK_TIMEOUT` | No | Timeout in seconds (default: `10`) |
+
+### `_api_notify.py` — REST API with Bearer token
+
+POSTs the provisioning result to a REST API endpoint using `Authorization: Bearer` authentication.
+
+| Env var | Required | Description |
+|---------|----------|-------------|
+| `VENDING_API_NOTIFY_URL` | Yes | API endpoint to POST to |
+| `VENDING_API_NOTIFY_TOKEN` | No | Bearer token value |
+| `VENDING_API_NOTIFY_TIMEOUT` | No | Timeout in seconds (default: `10`) |
+
+If the URL env var is not set, the extension silently skips.
+
+---
+
+## Lifecycle events
+
+The workflow emits named lifecycle events that extensions can subscribe to without being registered as steps. Handlers run after all custom steps complete.
+
+### Available events
+
+| Event | When fired |
+|-------|------------|
+| `PROVISIONING_STARTED` | Before custom steps begin |
+| `PROVISIONING_COMPLETED` | Always — after all steps finish |
+| `PROVISIONING_SUCCEEDED` | Only when `result.errors` is empty |
+| `PROVISIONING_FAILED` | Only when `result.errors` is non-empty |
+
+### Subscribing to events
+
+```python
+from subscription_vending.core.events import LifecycleEvent, on
+from subscription_vending.workflow import StepContext
+
+@on(LifecycleEvent.PROVISIONING_SUCCEEDED)
+async def notify_on_success(ctx: StepContext) -> None:
+    ...
+
+@on(LifecycleEvent.PROVISIONING_FAILED)
+async def alert_on_failure(ctx: StepContext) -> None:
+    for error in ctx.result.errors:
+        ...
+```
+
+Handlers receive the same `StepContext` as custom steps. Errors in handlers are caught, recorded in `result.errors`, and never abort remaining handlers.
