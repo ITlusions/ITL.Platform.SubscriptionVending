@@ -1,4 +1,7 @@
-[![CI](https://github.com/ITlusions/ITL.Platform.SubscriptionVending/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ITlusions/ITL.Platform.SubscriptionVending/actions/workflows/ci.yml)
+[![Pipeline](https://github.com/ITlusions/ITL.Platform.SubscriptionVending/actions/workflows/pipeline.yml/badge.svg?branch=main)](https://github.com/ITlusions/ITL.Platform.SubscriptionVending/actions/workflows/pipeline.yml)
+[![Publish Docs](https://github.com/ITlusions/ITL.Platform.SubscriptionVending/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/ITlusions/ITL.Platform.SubscriptionVending/actions/workflows/docs.yml)
+[![GitHub Pages](https://img.shields.io/badge/docs-GitHub%20Pages-0969da?logo=github)](https://itlusions.github.io/ITL.Platform.SubscriptionVending/)
+
 # ITL.Platform.SubscriptionVending
 
 Subscription Vending is a FastAPI microservice that automatically provisions new Azure subscriptions after creation.  
@@ -29,15 +32,16 @@ See [docs/provisioning-workflow.md](./docs/provisioning-workflow.md) for full de
 
 ---
 
-> **Detailed documentation** is available in the [`/docs`](./docs) folder:
-> - [Architecture overview](./docs/architecture.md)
-> - [Configuration reference](./docs/configuration.md)
-> - [Secrets handling](./docs/secrets.md)
-> - [Provisioning workflow](./docs/provisioning-workflow.md)
-> - [API reference](./docs/api.md)
-> - [Local development guide](./docs/development.md)
-> - [Infrastructure deployment (Bicep)](./docs/infrastructure.md)
-> - [Kubernetes deployment](./docs/kubernetes.md)
+> **Documentation site:** [itlusions.github.io/ITL.Platform.SubscriptionVending](https://itlusions.github.io/ITL.Platform.SubscriptionVending/)
+>
+> - [Architecture overview](https://itlusions.github.io/ITL.Platform.SubscriptionVending/architecture)
+> - [Configuration reference](https://itlusions.github.io/ITL.Platform.SubscriptionVending/configuration)
+> - [Secrets handling](https://itlusions.github.io/ITL.Platform.SubscriptionVending/secrets)
+> - [Provisioning workflow](https://itlusions.github.io/ITL.Platform.SubscriptionVending/provisioning-workflow)
+> - [API reference](https://itlusions.github.io/ITL.Platform.SubscriptionVending/api)
+> - [Local development guide](https://itlusions.github.io/ITL.Platform.SubscriptionVending/development)
+> - [Infrastructure deployment (Bicep)](https://itlusions.github.io/ITL.Platform.SubscriptionVending/infrastructure)
+> - [Kubernetes deployment](https://itlusions.github.io/ITL.Platform.SubscriptionVending/kubernetes)
 
 ---
 
