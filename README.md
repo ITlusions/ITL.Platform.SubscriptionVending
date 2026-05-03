@@ -268,3 +268,44 @@ See [docs/kubernetes.md](./docs/kubernetes.md) for full deployment instructions.
 pip install -e ".[dev]"
 pytest
 ```
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full guide — branching strategy, commit conventions, PR process, and coding standards.
+
+- **Report a bug** → [Bug Report](.github/ISSUE_TEMPLATE/bug_report.md)
+- **Request a feature** → [Feature Request](.github/ISSUE_TEMPLATE/feature_request.md)
+- **Propose an architectural decision** → [ADR](.github/ISSUE_TEMPLATE/adr.md)
+- **Report a security vulnerability** → [SECURITY.md](./SECURITY.md) (private advisory)
+
+---
+
+## GitHub Project
+
+Active sprint planning and backlog: **[Project #21 — Subscription Vending](https://github.com/orgs/ITlusions/projects/21)**
+
+### Issue types
+
+| Template | Label | Use for |
+|---|---|---|
+| Epic | `type:epic` | Multi-sprint body of work with child stories |
+| Story | `type:story` | User-facing value, deliverable in one sprint |
+| Task | `type:task` | Technical/operational work |
+| Bug | `bug` | Defect or regression |
+| Spike | `type:spike` | Time-boxed investigation |
+| ADR | `documentation` | Architecture Decision Record |
+
+### Onboarding a new project
+
+The `.github/scripts/onboard-project.ps1` script provisions a GitHub ProjectV2 with full Agile fields (Sprint, Priority, Story Points, Work Type, Effort, Epic, Blocked, Risk), milestones, and type labels:
+
+```powershell
+.\.github\scripts\onboard-project.ps1 `
+    -ProjectTitle "My Service" `
+    -RepoName     "ITlusions/ITL.MyService" `
+    -SprintCount  4 `
+    -CreateLabels `
+    -CreateViews
+```
