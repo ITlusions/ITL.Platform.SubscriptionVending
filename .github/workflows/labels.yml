@@ -7,9 +7,6 @@ on:
       - ".github/labels.yml"
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 permissions:
   issues: write
 
@@ -21,9 +18,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.2.2
 
-      - name: Sync labels
-        uses: EndBug/label-sync@v2
-        with:
-          config-file: .github/labels.yml
-          delete-other-labels: false
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sync labels via gh CLI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Parse .github/labels.yml and upsert every label using gh CLI.
+          # Uses 'gh label create --force' so existing labels are updated in place
+          # and missing ones are created — no third-party action required.
+          python3 - <<'EOF'
+          import subprocess, sys
+          try:
+              import yaml
+          except ImportError:
+              subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "pyyaml"])
+              import yaml
+
+          with open(".github/labels.yml") as f:
+              data = yaml.safe_load(f)
+
+          labels = data.get("labels", data) if isinstance(data, dict) else data
+          for label in labels:
+              name  = label["name"]
+              color = label.get("color", "ededed").lstrip("#")
+              desc  = label.get("description", "")
+              result = subprocess.run(
+                  ["gh", "label", "create", name,
+                   "--color", color, "--description", desc, "--force"],
+                  capture_output=True, text=True,
+              )
+              if result.returncode == 0:
+                  print(f"  ✓ {name}")
+              else:
+                  print(f"  ✗ {name}: {result.stderr.strip()}", file=sys.stderr)
+          EOF
