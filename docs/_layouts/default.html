@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ page.title }} — ITL Subscription Vending</title>
+  <meta name="description" content="{{ site.description }}" />
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --accent: #1f6feb;
+      --accent2: #58a6ff;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --success: #3fb950;
+      --radius: 8px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.7;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 56px;
+      flex-wrap: wrap;
+    }
+
+    .nav-logo {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--accent2);
+      text-decoration: none;
+      margin-right: 16px;
+      white-space: nowrap;
+    }
+    .nav-logo:hover { color: #fff; }
+
+    .nav-links {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+      white-space: nowrap;
+    }
+    .nav-links a:hover,
+    .nav-links a.active {
+      color: var(--text);
+      background: var(--surface2);
+    }
+
+    /* ── LAYOUT ── */
+    .page-wrapper {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+      width: 100%;
+      flex: 1;
+    }
+
+    /* ── PROSE ── */
+    .prose h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .prose h2 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 40px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .prose h3 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--accent2);
+      margin: 28px 0 8px;
+    }
+
+    .prose h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 20px 0 6px;
+    }
+
+    .prose p {
+      margin: 12px 0;
+      color: var(--text);
+    }
+
+    .prose a {
+      color: var(--accent2);
+      text-decoration: none;
+    }
+    .prose a:hover { text-decoration: underline; }
+
+    .prose ul,
+    .prose ol {
+      margin: 12px 0 12px 24px;
+    }
+
+    .prose li {
+      margin: 4px 0;
+      color: var(--text);
+    }
+
+    .prose li > ul,
+    .prose li > ol {
+      margin-top: 4px;
+    }
+
+    .prose blockquote {
+      border-left: 3px solid var(--accent);
+      margin: 16px 0;
+      padding: 10px 16px;
+      background: var(--surface);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--muted);
+    }
+
+    .prose hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    /* ── TABLES ── */
+    .prose table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 0.9rem;
+      background: var(--surface);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .prose th {
+      background: var(--surface2);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .prose td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .prose tr:last-child td { border-bottom: none; }
+    .prose tr:hover td { background: var(--surface2); }
+
+    /* ── CODE ── */
+    .prose code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 6px;
+      color: var(--accent2);
+    }
+
+    .prose pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      overflow-x: auto;
+      margin: 16px 0;
+      position: relative;
+    }
+
+    .prose pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--text);
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+
+    /* Rouge syntax highlighting — dark theme */
+    .highlight .k,  .highlight .kd, .highlight .kn { color: #ff7b72; }
+    .highlight .s,  .highlight .s1, .highlight .s2 { color: #a5d6ff; }
+    .highlight .c,  .highlight .c1, .highlight .cm { color: var(--muted); font-style: italic; }
+    .highlight .n,  .highlight .na              { color: #ffa657; }
+    .highlight .nv, .highlight .nb              { color: #79c0ff; }
+    .highlight .o                               { color: var(--text); }
+    .highlight .mi, .highlight .mf              { color: var(--success); }
+    .highlight .nt                              { color: #7ee787; }
+    .highlight .err                             { background: none; color: #ff7b72; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px;
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    footer a { color: var(--accent2); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      .nav-inner { height: auto; padding: 10px 16px; gap: 6px; }
+      .page-wrapper { padding: 32px 16px 60px; }
+      .prose h1 { font-size: 1.5rem; }
+      .prose h2 { font-size: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="{{ '/' | relative_url }}">⚡ ITL Subscription Vending</a>
+    <ul class="nav-links">
+      <li><a href="{{ '/provisioning-workflow' | relative_url }}"{% if page.url contains 'provisioning-workflow' %} class="active"{% endif %}>Workflow</a></li>
+      <li><a href="{{ '/architecture' | relative_url }}"{% if page.url contains 'architecture' %} class="active"{% endif %}>Architecture</a></li>
+      <li><a href="{{ '/api' | relative_url }}"{% if page.url contains '/api' %} class="active"{% endif %}>API</a></li>
+      <li><a href="{{ '/kubernetes' | relative_url }}"{% if page.url contains 'kubernetes' %} class="active"{% endif %}>Kubernetes</a></li>
+      <li><a href="{{ '/infrastructure' | relative_url }}"{% if page.url contains 'infrastructure' %} class="active"{% endif %}>Infrastructure</a></li>
+      <li><a href="{{ '/configuration' | relative_url }}"{% if page.url contains 'configuration' %} class="active"{% endif %}>Configuration</a></li>
+      <li><a href="{{ '/secrets' | relative_url }}"{% if page.url contains 'secrets' %} class="active"{% endif %}>Secrets</a></li>
+      <li><a href="{{ '/development' | relative_url }}"{% if page.url contains 'development' %} class="active"{% endif %}>Dev Guide</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="page-wrapper">
+  <div class="prose">
+    {{ content }}
+  </div>
+</main>
+
+<footer>
+  <a href="{{ '/' | relative_url }}">ITL Subscription Vending</a> &nbsp;·&nbsp;
+  <a href="https://github.com/ITlusions/ITL.Platform.SubscriptionVending" target="_blank">GitHub</a>
+  &nbsp;·&nbsp; Built with Jekyll
+</footer>
+
+</body>
+</html>

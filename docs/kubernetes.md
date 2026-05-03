@@ -1,3 +1,8 @@
+---
+layout: default
+title: Kubernetes Deployment
+---
+
 # Kubernetes Deployment
 
 The `k8s/` directory contains Kubernetes manifests for deploying the service on any Kubernetes cluster, including AKS.

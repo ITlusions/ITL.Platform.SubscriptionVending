@@ -1,3 +1,8 @@
+---
+layout: default
+title: Provisioning Workflow
+---
+
 # Provisioning Workflow
 
 When the service receives a `Microsoft.Resources.ResourceActionSuccess` event for a `Microsoft.Subscription/aliases/write` operation, it executes the following workflow for the new subscription (Steps 0–6). Each step is independent — a failure in one step is logged but does not stop subsequent steps.

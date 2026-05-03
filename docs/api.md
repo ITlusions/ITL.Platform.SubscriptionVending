@@ -1,3 +1,8 @@
+---
+layout: default
+title: API Reference
+---
+
 # API Reference
 
 The service exposes a minimal HTTP API. The interactive Swagger UI is available at `/docs` and the ReDoc UI at `/redoc` when the service is running.

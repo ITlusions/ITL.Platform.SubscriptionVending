@@ -1,31 +1,14 @@
-name: Pipeline
+﻿name: Pipeline
 
 on:
   push:
     branches: ["main", "develop", "feature/**"]
   pull_request:
     branches: ["main", "develop"]
-  release:
-    types: [published]
-  workflow_dispatch:
-    inputs:
-      bump:
-        description: "Version bump type (ignored when 'version' is set)"
-        required: false
-        default: patch
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-      version:
-        description: "Explicit version to release (e.g. 1.2.3 — overrides bump)"
-        required: false
-        default: ""
 
 concurrency:
   group: pipeline-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -33,15 +16,14 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ── Resolve version from latest git tag; bootstrap v1.0.0 if none exists ─────
+  # ── Compute version: bump on main, prerelease on develop/feature/*, read-only on PR ──
   version:
-    name: Resolve Version
+    name: Compute Version
     runs-on: ubuntu-latest
     permissions:
       contents: write
     outputs:
-      version: ${{ steps.resolve.outputs.version }}
-      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.compute.outputs.version }}
 
     steps:
       - name: Checkout (full history + tags)
@@ -50,32 +32,46 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve or bootstrap version
-        id: resolve
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Hatch
+        run: pip install hatch
+
+      - name: Compute version
+        id: compute
         run: |
-          git fetch --tags
-          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-          if [ -z "$LATEST_TAG" ]; then
-            echo "No semver tag found — bootstrapping v1.0.0"
-            LATEST_TAG="v1.0.0"
+          BRANCH="${{ github.ref_name }}"
+          EVENT="${{ github.event_name }}"
+          RUN_NUMBER="${{ github.run_number }}"
+
+          if [ "$EVENT" = "pull_request" ]; then
+            # PRs: just read current version, no modification
+            VERSION=$(hatch version)
+
+          elif [ "$BRANCH" = "main" ]; then
+            # main: bump patch, commit pyproject.toml, create tag, push
+            hatch version patch
+            VERSION=$(hatch version)
             git config user.name  "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag "$LATEST_TAG"
-            if git push origin "$LATEST_TAG" 2>/dev/null; then
-              echo "Bootstrapped $LATEST_TAG"
-            else
-              # Another concurrent run may have pushed the tag first; re-fetch and use it
-              git fetch --tags
-              LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-              echo "Bootstrap race — using existing tag: $LATEST_TAG"
-            fi
-          fi
-          VERSION="${LATEST_TAG#v}"
-          echo "Resolved version: $VERSION (tag: $LATEST_TAG)"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$LATEST_TAG"  >> "$GITHUB_OUTPUT"
+            git add pyproject.toml
+            git commit -m "chore: bump version to $VERSION [skip ci]"
+            git tag "v$VERSION"
+            git push origin main --follow-tags
 
-  # ── Python tests ─────────────────────────────────────────────────────────────
+          else
+            # develop / feature/*: prerelease tag, no commit
+            BASE=$(hatch version)
+            SANITIZED=$(echo "$BRANCH" | sed 's/[^a-zA-Z0-9.-]/-/g' | tr '[:upper:]' '[:lower:]')
+            VERSION="${BASE}-${SANITIZED}.${RUN_NUMBER}"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  # ── Python tests ──────────────────────────────────────────────────────────────
   test:
     name: Python Tests
     runs-on: ubuntu-latest
@@ -112,33 +108,31 @@ jobs:
           curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
           az bicep install
 
-      - name: Bicep lint — main.bicep
+      - name: Bicep lint
         run: az bicep lint --file infra/main.bicep
 
       - name: Bicep build (syntax check)
         run: az bicep build --file infra/main.bicep --outdir /tmp
 
-  # ── Docker build & push (push to main/develop, PRs, and releases — skip feature/* branches) ─
+  # ── Docker build & push ───────────────────────────────────────────────────────
   docker:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
     needs: [version, test, bicep-lint]
-    if: |
-      (github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/feature/')) ||
-      github.event_name == 'pull_request' ||
-      github.event_name == 'release'
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: Checkout
+      - name: Checkout (post-bump)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to GHCR
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
@@ -146,126 +140,57 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata (tags & labels)
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
-            type=sha,prefix=sha-,format=short
-          flavor: |
-            latest=false
+      - name: Compute Docker tags
+        id: tags
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          VERSION="${{ needs.version.outputs.version }}"
+          BRANCH="${{ github.ref_name }}"
 
-      - name: Build and push Docker image
+          if [ "$BRANCH" = "main" ]; then
+            MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1-2)
+            MAJOR=$(echo "$VERSION" | cut -d. -f1)
+            printf '%s\n%s\n%s\n%s\n' \
+              "${IMAGE}:${VERSION}" \
+              "${IMAGE}:${MAJOR_MINOR}" \
+              "${IMAGE}:${MAJOR}" \
+              "${IMAGE}:latest" > /tmp/docker_tags
+          else
+            echo "${IMAGE}:${VERSION}" > /tmp/docker_tags
+          fi
+
+          {
+            echo "tags<<EOF"
+            cat /tmp/docker_tags
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── Release: version bump → tag → GitHub release → Docker push ───────────────
+  # ── GitHub Release (main only) ────────────────────────────────────────────────
   release:
-    name: Release
+    name: GitHub Release
     runs-on: ubuntu-latest
-    needs: [version, test, bicep-lint]
-    if: github.event_name == 'workflow_dispatch'
+    needs: [version, docker]
+    if: github.ref_name == 'main' && github.event_name == 'push'
     permissions:
       contents: write
-      packages: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Hatch
-        run: pip install hatch
-
-      - name: Bump version
-        id: bump
-        run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            hatch version "${{ inputs.version }}"
-          else
-            hatch version "${{ inputs.bump }}"
-          fi
-          NEW_VERSION=$(hatch version)
-          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${NEW_VERSION}" >> "$GITHUB_OUTPUT"
-
-      - name: Commit version bump
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pyproject.toml
-          if git diff --cached --quiet; then
-            echo "::error::Version bump did not modify any version file. The version ${{ steps.bump.outputs.version }} may already be set or the bump command failed."
-            exit 1
-          fi
-          git commit -m "chore: bump version to ${{ steps.bump.outputs.version }}"
-          git push origin HEAD:${{ github.ref_name }}
-
-      - name: Create and push git tag
-        run: |
-          if git rev-parse "${{ steps.bump.outputs.tag }}" >/dev/null 2>&1; then
-            echo "::error::Tag ${{ steps.bump.outputs.tag }} already exists"
-            exit 1
-          fi
-          git tag "${{ steps.bump.outputs.tag }}"
-          git push origin "${{ steps.bump.outputs.tag }}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.bump.outputs.tag }}
-          name: ${{ steps.bump.outputs.tag }}
+          tag_name: v${{ needs.version.outputs.version }}
+          name: v${{ needs.version.outputs.version }}
           generate_release_notes: true
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract Docker metadata (tags & labels)
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}},value=${{ steps.bump.outputs.version }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ steps.bump.outputs.version }}
-            type=semver,pattern={{major}},value=${{ steps.bump.outputs.version }}
-            type=raw,value=latest
-            type=sha,prefix=sha-,format=short
-          flavor: |
-            latest=false
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max

@@ -1,0 +1,23 @@
+title: ITL Subscription Vending
+description: Automated Azure subscription provisioning via Event Grid
+baseurl: ""
+url: "https://itlusions.github.io/ITL.Platform.SubscriptionVending"
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+
+kramdown:
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    block:
+      line_numbers: false
+
+# Exclude files that shouldn't be built as pages
+exclude:
+  - "*.py"
+  - "*.sh"
+  - "docker-compose.yml"
+  - "Dockerfile"
+  - "pyproject.toml"
+  - "README.md"

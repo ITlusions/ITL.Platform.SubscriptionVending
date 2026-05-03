@@ -1,3 +1,8 @@
+---
+layout: default
+title: Architecture Overview
+---
+
 # Architecture Overview
 
 ## What is Subscription Vending?

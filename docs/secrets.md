@@ -1,3 +1,8 @@
+---
+layout: default
+title: Secrets Handling
+---
+
 # Secrets Handling
 
 This document defines which values are considered secrets, how they are kept out of source control, and how they are injected into the service in each supported deployment context.

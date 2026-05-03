@@ -1,3 +1,8 @@
+---
+layout: default
+title: Local Development Guide
+---
+
 # Local Development Guide
 
 This guide walks through setting up the service for local development, running it, and executing the test suite.

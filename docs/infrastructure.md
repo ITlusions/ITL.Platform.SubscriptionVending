@@ -1,3 +1,8 @@
+---
+layout: default
+title: Infrastructure Deployment
+---
+
 # Infrastructure Deployment (Bicep)
 
 The `infra/` directory contains Azure Bicep templates that deploy the complete cloud infrastructure required to run Subscription Vending as an Azure Function App.

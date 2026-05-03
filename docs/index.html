@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ITL Subscription Vending — Automated Azure Subscription Provisioning</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --accent: #1f6feb;
+      --accent-glow: rgba(31, 111, 235, 0.15);
+      --accent2: #58a6ff;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --success: #3fb950;
+      --warning: #d29922;
+      --tag-bg: #1f3347;
+      --tag-text: #58a6ff;
+      --radius: 8px;
+      --step-colors: #1f6feb, #238636, #9e6a03, #8b949e, #6e40c9, #f78166, #3fb950;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Nav ─────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .nav-brand svg { flex-shrink: 0; }
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+      font-size: 0.875rem;
+    }
+    .nav-links a { color: var(--muted); }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+
+    /* ── Hero ────────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      padding: 6rem 2rem 4rem;
+      background: radial-gradient(ellipse at 50% 0%, rgba(31, 111, 235, 0.12) 0%, transparent 70%);
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--tag-bg);
+      color: var(--tag-text);
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      border-radius: 2rem;
+      padding: 4px 14px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 1.25rem;
+      background: linear-gradient(135deg, #e6edf3 0%, #58a6ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: 1.125rem;
+      color: var(--muted);
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 22px;
+      border-radius: var(--radius);
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      border: none;
+    }
+    .btn:hover { opacity: 0.85; transform: translateY(-1px); text-decoration: none; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+
+    .badges {
+      display: flex;
+      justify-content: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-top: 2.5rem;
+    }
+    .badge-pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 2rem;
+      padding: 3px 12px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .badge-pill .dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 5px;
+      background: var(--success);
+    }
+
+    /* ── Layout ──────────────────────────────────────────── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+    section { padding: 5rem 0; }
+    section + section { border-top: 1px solid var(--border); }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: 1rem;
+    }
+    .section-sub {
+      color: var(--muted);
+      max-width: 540px;
+      margin-bottom: 3rem;
+    }
+
+    /* ── Flow diagram ────────────────────────────────────── */
+    .flow {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+    .flow-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 120px;
+    }
+    .flow-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      font-size: 0.8rem;
+      text-align: center;
+      white-space: nowrap;
+      color: var(--text);
+    }
+    .flow-box.highlight {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      color: var(--accent2);
+      font-weight: 600;
+    }
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      padding: 0 6px;
+      padding-top: 22px;
+      color: var(--muted);
+      font-size: 1.2rem;
+    }
+    .flow-sub {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    /* ── Steps ───────────────────────────────────────────── */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .step-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+    .step-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .step-card:nth-child(1)::before { background: #1f6feb; }
+    .step-card:nth-child(2)::before { background: #238636; }
+    .step-card:nth-child(3)::before { background: #9e6a03; }
+    .step-card:nth-child(4)::before { background: #8b949e; }
+    .step-card:nth-child(5)::before { background: #6e40c9; }
+    .step-card:nth-child(6)::before { background: #f78166; }
+    .step-card:nth-child(7)::before { background: #3fb950; }
+
+    .step-num {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .step-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .step-desc {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .step-tag {
+      display: inline-block;
+      margin-top: 0.75rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-family: ui-monospace, "Cascadia Code", monospace;
+    }
+
+    /* ── Features ────────────────────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+    }
+    .feature-icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .feature-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+    .feature-desc {
+      font-size: 0.83rem;
+      color: var(--muted);
+    }
+
+    /* ── Docs ────────────────────────────────────────────── */
+    .docs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 0.75rem;
+    }
+    .doc-link {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      color: var(--text);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .doc-link:hover {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+      text-decoration: none;
+      color: var(--accent2);
+    }
+    .doc-icon {
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+    .doc-title { font-weight: 500; font-size: 0.9rem; }
+    .doc-desc { font-size: 0.78rem; color: var(--muted); margin-top: 1px; }
+
+    /* ── Stack ───────────────────────────────────────────── */
+    .stack-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+    .stack-tag {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    /* ── Footer ──────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 640px) {
+      nav { padding: 0 1rem; }
+      .nav-links { display: none; }
+      .hero { padding: 4rem 1rem 3rem; }
+      .container { padding: 0 1rem; }
+      section { padding: 3.5rem 0; }
+      .flow { flex-direction: column; align-items: center; }
+      .flow-arrow { transform: rotate(90deg); padding: 4px 0; padding-left: 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-brand">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+    ITL Subscription Vending
+  </div>
+  <ul class="nav-links">
+    <li><a href="#how-it-works">How it works</a></li>
+    <li><a href="#steps">Workflow</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#docs">Docs</a></li>
+    <li><a href="https://github.com/ITlusions/ITL.Platform.SubscriptionVending" target="_blank" rel="noopener">GitHub</a></li>
+  </ul>
+</nav>
+
+<!-- Hero -->
+<header class="hero">
+  <div class="hero-badge">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Event-driven &middot; Zero-touch provisioning
+  </div>
+  <h1>Subscription Vending<br>on Autopilot</h1>
+  <p>A FastAPI microservice that automatically provisions new Azure subscriptions the moment they are created — no manual steps, no drift.</p>
+  <div class="hero-actions">
+    <a href="https://github.com/ITlusions/ITL.Platform.SubscriptionVending" class="btn btn-primary" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      View on GitHub
+    </a>
+    <a href="docs/architecture.md" class="btn btn-secondary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Architecture
+    </a>
+  </div>
+  <div class="badges">
+    <span class="badge-pill"><span class="dot"></span>Python 3.12</span>
+    <span class="badge-pill"><span class="dot" style="background:#1f6feb"></span>FastAPI</span>
+    <span class="badge-pill"><span class="dot" style="background:#9e6a03"></span>Azure Event Grid</span>
+    <span class="badge-pill"><span class="dot" style="background:#6e40c9"></span>Hatchling</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- How it works -->
+  <section id="how-it-works">
+    <div class="container">
+      <p class="section-label">How it works</p>
+      <h2 class="section-title">From subscription creation to fully configured — automatically</h2>
+      <p class="section-sub">The service hooks into Azure Event Grid. When a new subscription is created via the Azure portal or IaC, a <code>Microsoft.Resources.ResourceActionSuccess</code> event fires and triggers the provisioning workflow.</p>
+
+      <div class="flow">
+        <div class="flow-node">
+          <div class="flow-box">Azure Portal / IaC</div>
+          <div class="flow-sub">subscription create</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-box">Azure Event Grid</div>
+          <div class="flow-sub">Subscriptions topic</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-box highlight">POST /webhook/</div>
+          <div class="flow-sub">ITL Vending Service</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-box">Steps 0 – 6</div>
+          <div class="flow-sub">provisioning workflow</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <div class="flow-box" style="border-color:var(--success); color:var(--success)">200 OK</div>
+          <div class="flow-sub">always returns success</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Steps -->
+  <section id="steps">
+    <div class="container">
+      <p class="section-label">Provisioning Workflow</p>
+      <h2 class="section-title">7 deterministic steps, run every time</h2>
+      <p class="section-sub">Steps are independent of each other. A failure in one step does not block the others. The service always returns <code>200 OK</code> to Event Grid to prevent retry storms.</p>
+
+      <div class="steps-grid">
+
+        <div class="step-card">
+          <div class="step-num">Step 0</div>
+          <div class="step-title">Read Subscription Tags</div>
+          <div class="step-desc">Reads metadata tags on the new subscription to parameterise all subsequent steps — management group target, budget limits, RBAC owners, and more.</div>
+          <span class="step-tag">itl-mgmt-group, itl-budget, itl-owner</span>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">Step 1</div>
+          <div class="step-title">Move to Management Group</div>
+          <div class="step-desc">Moves the subscription to the target management group specified in the <code>itl-mgmt-group</code> tag, ensuring correct policy inheritance from day one.</div>
+          <span class="step-tag">azure-mgmt-managementgroups</span>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">Step 2</div>
+          <div class="step-title">Attach Foundation Initiative</div>
+          <div class="step-desc">Assigns the ITL Foundation Policy Initiative to the subscription via the ITL Authorization service, applying baseline compliance and security posture.</div>
+          <span class="step-tag">Authorization service</span>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">Step 3</div>
+          <div class="step-title">Create RBAC Role Assignments</div>
+          <div class="step-desc">Assigns Owner, Contributor, and Reader roles to principals configured in the subscription tags, granting the right teams immediate access.</div>
+          <span class="step-tag">azure-mgmt-authorization</span>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">Step 4</div>
+          <div class="step-title">Assign Azure Policies</div>
+          <div class="step-desc">Applies the default set of Azure Policy definitions at subscription scope — covering tagging, allowed regions, VM SKUs, and security baselines.</div>
+          <span class="step-tag">azure-mgmt-resource</span>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">Step 5</div>
+          <div class="step-title">Create Budget Alert</div>
+          <div class="step-desc">Provisions a cost budget and email alert when the <code>itl-budget</code> tag is present. Keeps teams informed before they hit their spending limit.</div>
+          <span class="step-tag">itl-budget tag required</span>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">Step 6</div>
+          <div class="step-title">Publish Outbound Event</div>
+          <div class="step-desc">Fires a completion event to a downstream Event Grid topic once all steps have run, enabling downstream automation such as ITSM ticket creation or Slack notifications.</div>
+          <span class="step-tag">VENDING_EVENT_GRID_TOPIC_ENDPOINT</span>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="container">
+      <p class="section-label">Key Features</p>
+      <h2 class="section-title">Built for reliability and observability</h2>
+      <p class="section-sub">Designed to run unattended in production, with sensible defaults and full visibility into every provisioning run.</p>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-title">Event-driven trigger</div>
+          <div class="feature-desc">Hooks into Azure Event Grid using <code>Microsoft.Resources.ResourceActionSuccess</code> — no polling, no cron jobs.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <div class="feature-title">Always returns 200</div>
+          <div class="feature-desc">Step failures are logged and surfaced in the response body but never cause Event Grid to retry the full payload.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🏷️</div>
+          <div class="feature-title">Tag-driven configuration</div>
+          <div class="feature-desc">All provisioning behaviour is controlled via subscription tags — no code changes needed for new subscriptions.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <div class="feature-title">Managed Identity auth</div>
+          <div class="feature-desc">Uses <code>azure-identity</code> DefaultAzureCredential — no secrets in environment variables, full support for Managed Identity and Workload Identity.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📦</div>
+          <div class="feature-title">Container-ready</div>
+          <div class="feature-desc">Ships with a multi-stage Dockerfile. Deploy to AKS, Azure Container Apps, or any Kubernetes cluster with the included Helm values.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔁</div>
+          <div class="feature-title">Automated versioning</div>
+          <div class="feature-desc">CI pipeline auto-bumps <code>pyproject.toml</code> version on every merge to <code>main</code> and tags the release in GitHub.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stack -->
+  <section id="stack">
+    <div class="container">
+      <p class="section-label">Tech Stack</p>
+      <h2 class="section-title">Standard Python, Azure-native SDKs</h2>
+      <p class="section-sub" style="margin-bottom: 1.5rem;">No proprietary frameworks. Swap any Azure SDK call for your own implementation without touching the webhook logic.</p>
+      <div class="stack-row">
+        <span class="stack-tag">Python ≥ 3.12</span>
+        <span class="stack-tag">FastAPI ≥ 0.111</span>
+        <span class="stack-tag">Pydantic v2</span>
+        <span class="stack-tag">uvicorn</span>
+        <span class="stack-tag">azure-identity</span>
+        <span class="stack-tag">azure-mgmt-managementgroups</span>
+        <span class="stack-tag">azure-mgmt-authorization</span>
+        <span class="stack-tag">azure-mgmt-resource</span>
+        <span class="stack-tag">azure-mgmt-subscription</span>
+        <span class="stack-tag">azure-mgmt-consumption</span>
+        <span class="stack-tag">azure-eventgrid</span>
+        <span class="stack-tag">httpx</span>
+        <span class="stack-tag">hatchling</span>
+        <span class="stack-tag">pytest + pytest-asyncio</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Docs -->
+  <section id="docs">
+    <div class="container">
+      <p class="section-label">Documentation</p>
+      <h2 class="section-title">Everything you need to deploy and extend</h2>
+      <p class="section-sub">Full reference docs live alongside the code in the <code>/docs</code> folder.</p>
+
+      <div class="docs-grid">
+        <a class="doc-link" href="architecture.md">
+          <span class="doc-icon">🏗️</span>
+          <div>
+            <div class="doc-title">Architecture</div>
+            <div class="doc-desc">High-level design, components &amp; data flow</div>
+          </div>
+        </a>
+        <a class="doc-link" href="api.md">
+          <span class="doc-icon">📡</span>
+          <div>
+            <div class="doc-title">API Reference</div>
+            <div class="doc-desc">Webhook endpoint, request &amp; response schemas</div>
+          </div>
+        </a>
+        <a class="doc-link" href="provisioning-workflow.md">
+          <span class="doc-icon">🔄</span>
+          <div>
+            <div class="doc-title">Provisioning Workflow</div>
+            <div class="doc-desc">Step-by-step detail on all 7 provisioning steps</div>
+          </div>
+        </a>
+        <a class="doc-link" href="configuration.md">
+          <span class="doc-icon">⚙️</span>
+          <div>
+            <div class="doc-title">Configuration</div>
+            <div class="doc-desc">Environment variables &amp; subscription tag reference</div>
+          </div>
+        </a>
+        <a class="doc-link" href="infrastructure.md">
+          <span class="doc-icon">☁️</span>
+          <div>
+            <div class="doc-title">Infrastructure</div>
+            <div class="doc-desc">Azure resource setup &amp; Event Grid subscription</div>
+          </div>
+        </a>
+        <a class="doc-link" href="kubernetes.md">
+          <span class="doc-icon">🐳</span>
+          <div>
+            <div class="doc-title">Kubernetes</div>
+            <div class="doc-desc">Deployment manifests, Helm values &amp; Workload Identity</div>
+          </div>
+        </a>
+        <a class="doc-link" href="development.md">
+          <span class="doc-icon">🛠️</span>
+          <div>
+            <div class="doc-title">Development</div>
+            <div class="doc-desc">Local setup, testing, and contributing guide</div>
+          </div>
+        </a>
+        <a class="doc-link" href="secrets.md">
+          <span class="doc-icon">🔑</span>
+          <div>
+            <div class="doc-title">Secrets</div>
+            <div class="doc-desc">Credentials, Key Vault integration &amp; rotation</div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>
+    &copy; <span id="yr"></span> <a href="https://github.com/ITlusions" target="_blank" rel="noopener">ITLusions</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/ITlusions/ITL.Platform.SubscriptionVending" target="_blank" rel="noopener">GitHub</a>
+    &nbsp;·&nbsp;
+    MIT License
+  </p>
+</footer>
+
+<script>
+  document.getElementById("yr").textContent = new Date().getFullYear();
+</script>
+
+</body>
+</html>
