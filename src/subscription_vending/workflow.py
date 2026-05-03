@@ -29,6 +29,8 @@ class StepContext:
         config:            Tag-derived provisioning config (environment, budget, etc.).
         settings:          Service settings / env-var config.
         result:            Mutable result object — append to ``result.errors`` on failure.
+        dry_run:           When ``True`` no Azure mutations or outbound HTTP calls are
+                           made.  Steps should log what *would* happen instead.
     """
 
     subscription_id:   str
@@ -36,6 +38,7 @@ class StepContext:
     config:            SubscriptionConfig
     settings:          Settings
     result:            "ProvisioningResult"
+    dry_run:           bool = False
 
 
 # Type alias for a custom step coroutine.
@@ -135,6 +138,7 @@ class ProvisioningResult:
     initiative_id:    str = ""
     rbac_roles:       list[str] = field(default_factory=list)
     errors:           list[str] = field(default_factory=list)
+    dry_run:          bool = False
 
     @property
     def success(self) -> bool:
@@ -146,6 +150,8 @@ async def run_provisioning_workflow(
     subscription_name: str,
     management_group_id: str,
     settings: Settings,
+    *,
+    dry_run: bool = False,
 ) -> ProvisioningResult:
     """
     Execute the provisioning workflow for a new subscription.
@@ -161,91 +167,120 @@ async def run_provisioning_workflow(
 
     Returns a :class:`ProvisioningResult` summarising the outcome of each step.
     """
-    result = ProvisioningResult(subscription_id=subscription_id)
+    result = ProvisioningResult(subscription_id=subscription_id, dry_run=dry_run)
 
     logger.info(
-        "Starting provisioning workflow for subscription %s (%s)",
+        "Starting provisioning workflow for subscription %s (%s)%s",
         subscription_id,
         subscription_name,
+        " [DRY RUN]" if dry_run else "",
     )
 
     # Step 0 — Read subscription tags
     from .azure.management_groups import _get_credential  # noqa: PLC0415
 
-    credential = _get_credential(settings)
-    config = await read_subscription_config(credential, subscription_id, settings)
+    if dry_run:
+        logger.info("DRY RUN: skipping Azure tag read, using default SubscriptionConfig")
+        config = SubscriptionConfig()
+        credential = None
+    else:
+        credential = _get_credential(settings)
+        config = await read_subscription_config(credential, subscription_id, settings)
 
     # Step 1 — Management group placement
     # Prefer the tag-derived MG; fall back to the caller-supplied value or the
     # root MG configured in settings.
-    try:
-        mg_id = config.management_group_name or management_group_id or settings.root_management_group
-        await move_subscription_to_management_group(
-            subscription_id=subscription_id,
-            management_group_id=mg_id,
-            settings=settings,
-        )
+    mg_id = config.management_group_name or management_group_id or settings.root_management_group
+    if dry_run:
+        logger.info("DRY RUN: would move subscription %s to management group %s", subscription_id, mg_id)
         result.management_group = mg_id
-        logger.info("Subscription %s moved to management group %s", subscription_id, mg_id)
-    except Exception as exc:  # noqa: BLE001
-        result.errors.append(f"MG assignment failed: {exc}")
-        logger.exception("Failed to move subscription to management group")
+    else:
+        try:
+            await move_subscription_to_management_group(
+                subscription_id=subscription_id,
+                management_group_id=mg_id,
+                settings=settings,
+            )
+            result.management_group = mg_id
+            logger.info("Subscription %s moved to management group %s", subscription_id, mg_id)
+        except Exception as exc:  # noqa: BLE001
+            result.errors.append(f"MG assignment failed: {exc}")
+            logger.exception("Failed to move subscription to management group")
 
     # Step 2 — Attach foundation initiative
-    try:
-        initiative_id = await attach_foundation_initiative(
-            authorization_url=settings.authorization_service_url,
-            subscription_id=subscription_id,
-        )
-        result.initiative_id = initiative_id
-        logger.info("Foundation initiative attached for subscription %s: %s", subscription_id, initiative_id)
-    except Exception as exc:  # noqa: BLE001
-        result.errors.append(f"Foundation initiative failed: {exc}")
-        logger.exception("Failed to attach foundation initiative")
+    if dry_run:
+        logger.info("DRY RUN: would attach foundation initiative for subscription %s", subscription_id)
+    else:
+        try:
+            initiative_id = await attach_foundation_initiative(
+                authorization_url=settings.authorization_service_url,
+                subscription_id=subscription_id,
+            )
+            result.initiative_id = initiative_id
+            logger.info("Foundation initiative attached for subscription %s: %s", subscription_id, initiative_id)
+        except Exception as exc:  # noqa: BLE001
+            result.errors.append(f"Foundation initiative failed: {exc}")
+            logger.exception("Failed to attach foundation initiative")
 
     # Step 3 — RBAC role assignments
-    try:
-        roles = await create_initial_rbac(subscription_id=subscription_id, settings=settings)
-        result.rbac_roles = roles
-        logger.info("Default RBAC roles assigned for subscription %s", subscription_id)
-    except Exception as exc:  # noqa: BLE001
-        result.errors.append(f"RBAC creation failed: {exc}")
-        logger.exception("Failed to assign default RBAC roles")
+    if dry_run:
+        logger.info("DRY RUN: would assign default RBAC roles for subscription %s", subscription_id)
+    else:
+        try:
+            roles = await create_initial_rbac(subscription_id=subscription_id, settings=settings)
+            result.rbac_roles = roles
+            logger.info("Default RBAC roles assigned for subscription %s", subscription_id)
+        except Exception as exc:  # noqa: BLE001
+            result.errors.append(f"RBAC creation failed: {exc}")
+            logger.exception("Failed to assign default RBAC roles")
 
     # Step 4 — Policy assignments
-    try:
-        await assign_default_policies(subscription_id=subscription_id, settings=settings)
-        logger.info("Default policies assigned for subscription %s", subscription_id)
-    except Exception as exc:  # noqa: BLE001
-        result.errors.append(f"Policy assignment failed: {exc}")
-        logger.exception("Failed to assign default policies")
+    if dry_run:
+        logger.info("DRY RUN: would assign default policies for subscription %s", subscription_id)
+    else:
+        try:
+            await assign_default_policies(subscription_id=subscription_id, settings=settings)
+            logger.info("Default policies assigned for subscription %s", subscription_id)
+        except Exception as exc:  # noqa: BLE001
+            result.errors.append(f"Policy assignment failed: {exc}")
+            logger.exception("Failed to assign default policies")
 
     # Step 5 — Cost budget alert (only when itl-budget tag is set)
     if config.budget_eur > 0:
-        try:
-            contact_email = config.owner_email or settings.default_alert_email
-            await _create_budget_alert(
-                credential=credential,
-                subscription_id=subscription_id,
-                amount=config.budget_eur,
-                contact_email=contact_email,
-            )
+        if dry_run:
             logger.info(
-                "Budget alert created for subscription %s (amount=%d EUR, contact=%s)",
+                "DRY RUN: would create budget alert for subscription %s (amount=%d EUR)",
                 subscription_id,
                 config.budget_eur,
-                contact_email,
             )
-        except Exception as exc:  # noqa: BLE001
-            result.errors.append(f"Budget alert failed: {exc}")
-            logger.exception("Failed to create budget alert for subscription %s", subscription_id)
+        else:
+            try:
+                contact_email = config.owner_email or settings.default_alert_email
+                await _create_budget_alert(
+                    credential=credential,
+                    subscription_id=subscription_id,
+                    amount=config.budget_eur,
+                    contact_email=contact_email,
+                )
+                logger.info(
+                    "Budget alert created for subscription %s (amount=%d EUR, contact=%s)",
+                    subscription_id,
+                    config.budget_eur,
+                    contact_email,
+                )
+            except Exception as exc:  # noqa: BLE001
+                result.errors.append(f"Budget alert failed: {exc}")
+                logger.exception("Failed to create budget alert for subscription %s", subscription_id)
 
     # Step 6 — Publish outbound notification event (non-fatal)
-    await publish_provisioned_event(
-        result=result,
-        subscription_name=subscription_name,
-        settings=settings,
-    )
+    if dry_run:
+        logger.info("DRY RUN: would publish provisioned event for subscription %s", subscription_id)
+    else:
+        await publish_provisioned_event(
+            result=result,
+            subscription_name=subscription_name,
+            settings=settings,
+        )
 
     # Custom steps — registered via @register_step, executed in dependency order
     ctx = StepContext(
@@ -254,6 +289,7 @@ async def run_provisioning_workflow(
         config=config,
         settings=settings,
         result=result,
+        dry_run=dry_run,
     )
 
     await emit(LifecycleEvent.PROVISIONING_STARTED, ctx)

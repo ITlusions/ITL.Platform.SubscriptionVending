@@ -24,6 +24,7 @@ class MockEventRequest(BaseModel):
     subscription_id: str = Field(..., description="Subscription ID to provision")
     subscription_name: str = Field("mock-subscription", description="Display name")
     management_group_id: str = Field("", description="Target management group (optional)")
+    dry_run: bool = Field(False, description="When true, log what would happen without making any Azure calls")
 
 
 @router.post(
@@ -45,6 +46,7 @@ async def mock_webhook(body: MockEventRequest) -> WebhookResponse:
         subscription_name=body.subscription_name,
         management_group_id=body.management_group_id,
         settings=_settings,
+        dry_run=body.dry_run,
     )
 
     any_error = any(v.startswith("error") for v in results.values())

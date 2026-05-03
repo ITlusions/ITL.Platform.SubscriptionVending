@@ -97,6 +97,10 @@ class BaseStep(ABC):
             self.logger.debug("%s: URL not configured, skipping", type(self).__name__)
             return False
 
+        if ctx.dry_run:
+            self.logger.info("DRY RUN: %s would POST to %s", type(self).__name__, url)
+            return False
+
         merged: dict[str, str] = {"Content-Type": "application/json"}
         if headers:
             merged.update(headers)
