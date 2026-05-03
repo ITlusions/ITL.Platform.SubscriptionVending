@@ -17,13 +17,13 @@ import logging
 from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel
 
-from ..config import Settings
+from ..config import get_settings
 from ..workflow import run_provisioning_workflow
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhook", tags=["Replay"])
 
-_settings = Settings()
+_settings = get_settings()
 
 
 class ReplayRequest(BaseModel):

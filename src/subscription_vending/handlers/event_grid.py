@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 from pydantic import ValidationError
 
-from ..config import Settings
+from ..config import get_settings
 from ..models import EventGridEvent
 from ..retry.dispatcher import dispatch
 
@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhook", tags=["Event Grid"])
 
-# Singleton settings loaded once at import time.
-_settings = Settings()
+_settings = get_settings()
 
 
 def _verify_sas_key(aeg_sas_key: str | None, sas_key: str) -> None:

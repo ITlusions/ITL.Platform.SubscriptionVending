@@ -12,14 +12,14 @@ import logging
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from ..config import Settings
+from ..config import get_settings
 from ..workflow import run_provisioning_workflow
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhook", tags=["Preflight"])
 
-_settings = Settings()
+_settings = get_settings()
 
 
 class PreflightRequest(BaseModel):

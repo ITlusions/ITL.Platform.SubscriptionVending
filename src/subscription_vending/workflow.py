@@ -15,189 +15,26 @@ from .azure.tags import SubscriptionConfig, read_subscription_config
 from .config import Settings
 from .core.events import LifecycleEvent, emit
 
+# ── Re-exports from domain and core.registry ─────────────────────────────────
+# External code (extensions, tests) that imports from this module continues to
+# work without modification.  New code should import from the source modules
+# directly:
+#
+#   from subscription_vending.domain.context import StepContext, ProvisioningResult
+#   from subscription_vending.core.registry import register_step, register_gate, WorkflowStep
+
+from .domain.context import ProvisioningResult, StepContext  # noqa: F401
+from .core.registry import (  # noqa: F401
+    WorkflowStep,
+    _EXTRA_STEPS,
+    _GATE_STEPS,
+    _StepEntry,
+    register_gate,
+    register_step,
+    toposort as _toposort,
+)
+
 logger = logging.getLogger(__name__)
-
-
-# ── Custom step registry ──────────────────────────────────────────────────────
-
-@dataclass
-class StepContext:
-    """Passed to every workflow step.
-
-    Attributes:
-        subscription_id:          The newly created Azure subscription ID.
-        subscription_name:        Display name of the subscription.
-        config:                   Tag-derived provisioning config (environment, budget, etc.).
-        settings:                 Service settings / env-var config.
-        result:                   Mutable result object — append to ``result.errors`` on failure.
-        dry_run:                  When ``True`` no Azure mutations or outbound HTTP calls are
-                                  made.  Steps should log what *would* happen instead.
-        credential:               Azure credential object (``None`` in dry-run mode).
-        event_management_group_id: Management group ID from the Event Grid event payload.
-                                  Used as a fallback by :data:`STEP_MG` when no
-                                  ``itl-environment`` tag is present.
-    """
-
-    subscription_id:           str
-    subscription_name:         str
-    config:                    SubscriptionConfig
-    settings:                  Settings
-    result:                    "ProvisioningResult"
-    dry_run:                   bool = False
-    credential:                Any = None
-    event_management_group_id: str = ""
-
-
-# Type alias for a custom step coroutine.
-WorkflowStep = Callable[[StepContext], Awaitable[None]]
-
-
-@dataclass
-class _StepEntry:
-    fn: WorkflowStep
-    depends_on: list[WorkflowStep] = field(default_factory=list)
-    stop_on_error: bool = False
-
-
-_EXTRA_STEPS: list[_StepEntry] = []
-
-# Gate steps run sequentially *before* all workflow steps.
-# If a gate step with stop_on_error=True records an error, the rest of the
-# gates AND all workflow steps are skipped.
-_GATE_STEPS: list[_StepEntry] = []
-
-
-def register_gate(
-    fn: WorkflowStep | None = None,
-    *,
-    stop_on_error: bool = True,
-) -> WorkflowStep | Callable[[WorkflowStep], WorkflowStep]:
-    """Register *fn* as a gate check that runs before any provisioning step.
-
-    Gate checks execute in registration order, before the topological step
-    graph.  They are ideal for pre-flight validation (e.g. ServiceNow ticket
-    checks) that must abort provisioning if they fail.
-
-    ``stop_on_error`` defaults to ``True`` for gate checks because failing a
-    gate should prevent the workflow from running.
-
-    Usage::
-
-        from subscription_vending.workflow import register_gate, StepContext
-
-        @register_gate
-        async def require_snow_ticket(ctx: StepContext) -> None:
-            if not ctx.config.snow_ticket:
-                ctx.result.errors.append("No ServiceNow ticket on subscription")
-
-    Class-based (via :class:`~core.base.BaseStep`)::
-
-        MyGateStep().register_gate()
-    """
-    def _register(f: WorkflowStep) -> WorkflowStep:
-        _GATE_STEPS.append(_StepEntry(fn=f, depends_on=[], stop_on_error=stop_on_error))
-        _name = getattr(f, "__qualname__", type(f).__qualname__)
-        logger.debug("Registered gate check: %s", _name)
-        return f
-
-    if fn is not None:
-        return _register(fn)
-    return _register
-
-
-def _toposort(entries: list[_StepEntry]) -> list[_StepEntry]:
-    """Return step entries ordered so every dependency runs before its dependent.
-
-    Raises ``ValueError`` if a declared dependency is not registered, or if a
-    dependency cycle is detected.
-    """
-    fn_to_entry: dict[WorkflowStep, _StepEntry] = {e.fn: e for e in entries}
-    visiting: set[WorkflowStep] = set()   # cycle detection
-    visited:  set[WorkflowStep] = set()
-    order:    list[_StepEntry] = []
-
-    def _visit(fn: WorkflowStep) -> None:
-        if fn in visited:
-            return
-        if fn in visiting:
-            raise ValueError(
-                f"Dependency cycle detected involving custom step '{fn.__qualname__}'"
-            )
-        visiting.add(fn)
-        entry = fn_to_entry.get(fn)
-        if entry:
-            for dep in entry.depends_on:
-                if dep not in fn_to_entry:
-                    raise ValueError(
-                        f"Step '{fn.__qualname__}' depends on '{dep.__qualname__}' "
-                        "which is not registered."
-                    )
-                _visit(dep)
-        visiting.discard(fn)
-        visited.add(fn)
-        order.append(fn_to_entry[fn])
-
-    for entry in entries:
-        _visit(entry.fn)
-
-    return order
-
-
-def register_step(
-    fn: WorkflowStep | None = None,
-    *,
-    depends_on: list[WorkflowStep] | None = None,
-    stop_on_error: bool = False,
-) -> WorkflowStep | Callable[[WorkflowStep], WorkflowStep]:
-    """Register *fn* as a provisioning step.
-
-    Decorated steps are executed in topological order (``depends_on``).
-    A raised exception is caught, recorded in ``ctx.result.errors``, and by
-    default does **not** prevent remaining steps from running.
-
-    Set ``stop_on_error=True`` to abort all remaining steps when this step
-    records an error (either by raising or by appending to ``ctx.result.errors``).
-
-    Usage (no dependencies)::
-
-        from subscription_vending.workflow import register_step, StepContext
-
-        @register_step
-        async def my_step(ctx: StepContext) -> None:
-            ...
-
-    Usage (with dependency and stop-on-error)::
-
-        @register_step(depends_on=[my_step], stop_on_error=True)
-        async def critical_step(ctx: StepContext) -> None:
-            ...
-    """
-    def _register(f: WorkflowStep) -> WorkflowStep:
-        _EXTRA_STEPS.append(_StepEntry(fn=f, depends_on=list(depends_on or []), stop_on_error=stop_on_error))
-        _name = getattr(f, "__qualname__", type(f).__qualname__)
-        logger.debug("Registered workflow step: %s", _name)
-        return f
-
-    if fn is not None:
-        # Used as @register_step (no parentheses)
-        return _register(fn)
-    # Used as @register_step(depends_on=[...]) or @register_step(stop_on_error=True)
-    return _register
-
-
-@dataclass
-class ProvisioningResult:
-    subscription_id:  str
-    management_group: str = ""
-    initiative_id:    str = ""
-    rbac_roles:       list[str] = field(default_factory=list)
-    errors:           list[str] = field(default_factory=list)
-    plan:             list[str] = field(default_factory=list)
-    dry_run:          bool = False
-
-    @property
-    def success(self) -> bool:
-        return len(self.errors) == 0
 
 
 # ── Built-in workflow steps (Steps 1–6) ───────────────────────────────────────

@@ -21,7 +21,7 @@ import logging
 from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel
 
-from ..config import Settings
+from ..config import get_settings
 from ..retry.models import ProvisioningJob
 from ..retry.queue_client import move_to_dlq
 from ..workflow import run_provisioning_workflow
@@ -29,7 +29,7 @@ from ..workflow import run_provisioning_workflow
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/worker", tags=["Queue Worker"])
 
-_settings = Settings()
+_settings = get_settings()
 
 
 class QueueMessage(BaseModel):

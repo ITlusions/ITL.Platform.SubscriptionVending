@@ -1,4 +1,5 @@
 import json
+from functools import lru_cache
 from typing import Dict
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -82,3 +83,20 @@ class Settings(BaseSettings):
 
     # Shared secret for /worker/process-job and /webhook/replay (leave empty to disable auth)
     worker_secret:               str = ""
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Return the singleton :class:`Settings` instance.
+
+    The instance is constructed once and cached for the lifetime of the
+    process.  Use this function instead of calling ``Settings()`` directly to
+    avoid creating multiple instances that each read environment variables.
+
+    In tests, call ``get_settings.cache_clear()`` before patching env vars::
+
+        get_settings.cache_clear()
+        monkeypatch.setenv("VENDING_AZURE_TENANT_ID", "test-tenant")
+        settings = get_settings()
+    """
+    return Settings()  # type: ignore[call-arg]

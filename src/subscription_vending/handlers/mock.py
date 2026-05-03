@@ -9,13 +9,13 @@ from pydantic import BaseModel, Field
 
 from ..models import WebhookResponse
 from ..workflow import run_provisioning_workflow
-from ..config import Settings
+from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhook", tags=["Mock"])
 
-_settings = Settings()
+_settings = get_settings()
 
 
 class MockEventRequest(BaseModel):
