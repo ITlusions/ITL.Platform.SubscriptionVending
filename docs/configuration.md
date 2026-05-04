@@ -128,7 +128,7 @@ The following variables control which Azure AD principals receive default role a
 
 These variables are read by the built-in extension modules in `extensions/`. They are optional — leave them unset to disable the corresponding extension.
 
-### Webhook notify (`extensions/_webhook_notify.py`)
+### Webhook notify (`extensions/webhook_notify.py`)
 
 Posts the provisioning result as JSON to a plain HTTPS endpoint after each workflow run.
 
@@ -138,7 +138,7 @@ Posts the provisioning result as JSON to a plain HTTPS endpoint after each workf
 | `VENDING_WEBHOOK_SECRET` | `""` | Sent as the `X-Webhook-Secret` header. Leave empty to omit the header. |
 | `VENDING_WEBHOOK_TIMEOUT` | `10` | Request timeout in seconds. |
 
-### API notify (`extensions/_api_notify.py`)
+### API notify (`extensions/api_notify.py`)
 
 Posts the provisioning result as JSON to a REST API endpoint using Bearer token authentication.
 
@@ -148,11 +148,11 @@ Posts the provisioning result as JSON to a REST API endpoint using Bearer token 
 | `VENDING_API_NOTIFY_TOKEN` | `""` | Bearer token value sent as `Authorization: Bearer <token>`. Leave empty to omit the header. |
 | `VENDING_API_NOTIFY_TIMEOUT` | `10` | Request timeout in seconds. |
 
-> Both extension files are prefixed with `_` which means they are **not** auto-discovered. To enable one, rename it (remove the leading `_`) or create a thin wrapper module in `extensions/` that imports and registers it manually.
+> Both extensions are auto-discovered at startup. They activate when their controlling env var is set (`VENDING_WEBHOOK_URL` or `VENDING_API_NOTIFY_URL` respectively). No code changes are required — set the env var and the extension registers itself.
 
 ---
 
-### ServiceNow check (`extensions/_servicenow_check.py`)
+### ServiceNow check (`extensions/servicenow_check.py`)
 
 Gate check that validates a ServiceNow ticket before any provisioning step runs. The check is read-only and runs even during dry-run.
 
@@ -165,7 +165,7 @@ Gate check that validates a ServiceNow ticket before any provisioning step runs.
 | `VENDING_SNOW_REQUIRE_STATE` | `approved` | Required value of the `approval` or `state` field. Set to `""` to check existence only. |
 | `VENDING_SNOW_TIMEOUT` | `10` | HTTP timeout in seconds. |
 
-### ServiceNow feedback (`extensions/_servicenow_feedback.py`)
+### ServiceNow feedback (`extensions/servicenow_feedback.py`)
 
 Provisioning step that PATCHes the ServiceNow ticket with the outcome after `STEP_NOTIFY`. Feedback failures are non-fatal.
 
@@ -212,7 +212,7 @@ Azure subscription tags are read at the start of the provisioning workflow. They
 | `itl-environment` | Any string (e.g. `production`, `staging`, `acceptance`, `customer-a`) | Selects the target management group via `VENDING_ENVIRONMENT_MG_MAPPING`. Also determines policy enforcement mode (`Default` for `production`, `DoNotEnforce` for all others). | `sandbox` MG |
 | `itl-aks` | `true`, `false` | Marks the subscription for AKS/Flux base chart installation. | `false` |
 | `itl-budget` | Integer (e.g. `500`) | Creates a monthly Azure Cost Management budget at the specified EUR amount with e-mail alerts at 80 % and 100 %. | No budget alert |
-| `itl-owner` | E-mail address | Contact address for budget alert notifications. Overrides `VENDING_DEFAULT_ALERT_EMAIL`. | `VENDING_DEFAULT_ALERT_EMAIL` || `itl-snow-ticket` | Ticket number (e.g. `RITM0041872`) | Validated by the ServiceNow gate check before provisioning starts. Required when `_servicenow_check` extension is active. Updated with the provisioning outcome by the `_servicenow_feedback` extension. | *(gate skipped if absent and SNOW not configured)* |
+| `itl-owner` | E-mail address | Contact address for budget alert notifications. Overrides `VENDING_DEFAULT_ALERT_EMAIL`. | `VENDING_DEFAULT_ALERT_EMAIL` || `itl-snow-ticket` | Ticket number (e.g. `RITM0041872`) | Validated by the ServiceNow gate check before provisioning starts. Required when `servicenow_check` extension is active. Updated with the provisioning outcome by the `servicenow_feedback` extension. | *(gate skipped if absent and SNOW not configured)* |
 Invalid tag values are silently ignored and the corresponding default is used, so provisioning always continues even when tags are malformed.
 
 ### Configurable tag key names

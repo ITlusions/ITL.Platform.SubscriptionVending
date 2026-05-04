@@ -44,38 +44,37 @@ ITL Subscription Vending  (POST /webhook/)
 The service is designed as a **Microkernel / Plugin pipeline engine**. The core framework is fixed; all provisioning logic is pluggable.
 
 ```
-handlers/          driving adapters (FastAPI routers)
+handlers/                  driving adapters (FastAPI routers)
      │
-retry/dispatcher   strategy: none / queue / dead_letter
+infrastructure/queue/      retry strategy: none / queue / dead_letter
      │
-workflow.py        orchestrator — built-in steps 1–6 + toposort
+workflow/engine.py         WorkflowEngine — built-in steps 1–6 + toposort
      │
-core/registry.py   step + gate registries
+core/registry.py           step + gate registries
      │
-core/base.py       BaseStep ABC — plugin contract
+core/base.py               BaseStep ABC — plugin contract
      │
-domain/            pure domain objects (StepContext, ProvisioningResult)
+core/context.py            StepContext, ProvisioningResult — pure dataclasses
      │
-azure/             Azure SDK adapters
+infrastructure/azure/      Azure SDK adapters
      │
-core/events.py     lifecycle bus: STARTED / COMPLETED / SUCCEEDED / FAILED
+core/events.py             lifecycle bus: STARTED / COMPLETED / SUCCEEDED / FAILED
      │
-extensions/        auto-discovered plugins
+extensions/                auto-discovered plugins
 ```
 
 ### Layer responsibilities
 
 | Layer / folder | Responsibility |
 |---|---|
-| `domain/` | Pure domain objects. No I/O, no framework imports. |
-| `core/` | Framework skeleton: `BaseStep` ABC, step registry, lifecycle event bus, port contracts (`protocols.py`), exception hierarchy (`exceptions.py`). No business logic. |
+| `core/` | Pure domain + framework skeleton: `BaseStep` ABC, `StepContext`, `ProvisioningResult`, `Settings`, step registry, lifecycle event bus, port contracts (`protocols.py`), exception hierarchy (`exceptions.py`). No business logic, no I/O. |
 | `schemas/` | Pydantic HTTP surface contracts. Only imported by `handlers/`. |
-| `azure/` | All Azure SDK calls. No workflow orchestration. |
-| `extensions/` | Auto-discovered plugins. Each module self-registers at import. |
-| `handlers/` | FastAPI routers (webhook, worker, preflight, replay, mock). |
-| `retry/` | Retry strategy: inline (`none`), Azure Storage Queue (`queue`), dead-letter (`dead_letter`). |
-| `config.py` | All settings via `Pydantic BaseSettings`. Use `get_settings()` — never instantiate `Settings()` directly. |
-| `workflow.py` | Orchestrator for built-in steps 1–6. Re-exports `StepContext`, `register_step`, `register_gate` for backward compatibility. |
+| `infrastructure/azure/` | All Azure SDK calls. No workflow orchestration. |
+| `infrastructure/queue/` | Retry strategy dispatcher and Azure Storage Queue client. |
+| `extensions/` | Auto-discovered plugins. Each module self-registers at import. Only modules starting with `__` are excluded from discovery. |
+| `handlers/` | FastAPI routers, each as a sub-package (`event_grid/`, `worker/`, `preflight/`, `replay/`, `mock/`). |
+| `core/config.py` | All settings via `Pydantic BaseSettings`. Use `get_settings()` — never instantiate `Settings()` directly. |
+| `workflow/` | Package: `engine.py` hosts `WorkflowEngine` and the backward-compat `run_provisioning_workflow` wrapper; `steps.py` defines built-in steps 1–6. |
 
 ---
 
@@ -85,27 +84,37 @@ extensions/        auto-discovered plugins
 
 | Module | Responsibility |
 |--------|---------------|
-| `main.py` | Application factory; mounts routers; exposes `/health`; calls `autodiscover()` |
-| `config.py` | Pydantic-settings `Settings` class; `get_settings()` singleton (`@lru_cache`); loads `VENDING_*` env vars |
-| `models.py` | Backward-compatible re-export shim — delegates to `schemas/event_grid.py`; deprecated for new code |
-| `workflow.py` | Orchestrates the provisioning workflow (built-in steps 1–6 + custom steps + lifecycle events); re-exports domain and registry symbols |
-| `domain/context.py` | `StepContext` and `ProvisioningResult` — pure domain dataclasses with no I/O or framework dependencies |
+| `main.py` | Application factory; mounts routers; exposes `/health`; calls `autodiscover()` inside `lifespan` |
+| `core/config.py` | Pydantic-settings `Settings` class; `get_settings()` singleton (`@lru_cache`); loads `VENDING_*` env vars |
+| `core/context.py` | `StepContext` and `ProvisioningResult` — pure domain dataclasses with no I/O or framework dependencies |
+| `core/job.py` | `ProvisioningJob` dataclass — payload written to / read from the retry queue |
+| `core/enums.py` | `RetryStrategy` enum (`none`, `queue`, `dead_letter`) |
 | `core/base.py` | `BaseStep` ABC — base class for all custom provisioning steps |
 | `core/events.py` | Lifecycle event bus — `LifecycleEvent`, `on()`, `emit()` |
-| `core/registry.py` | Step and gate registries (`_EXTRA_STEPS`, `_GATE_STEPS`), `register_step()`, `register_gate()`, `toposort()` |
+| `core/registry.py` | Step and gate registries (`_EXTRA_STEPS`, `_GATE_STEPS`), `register_step()`, `register_gate()`, `_toposort()` |
 | `core/protocols.py` | Port contracts: `ManagementGroupPort`, `RbacPort`, `PolicyPort`, `NotificationPort`, `TagReaderPort` — all `@runtime_checkable Protocol` |
 | `core/exceptions.py` | Typed exception hierarchy: `AppError → ProvisioningError` (`GateCheckFailed`, `StepFailed`) `\| AzureIntegrationError` (`ManagementGroupError`, `RbacError`, `PolicyError`, `NotificationError`) `\| ConfigurationError \| AuthorizationError` |
 | `schemas/event_grid.py` | HTTP surface contracts: `EventGridEvent`, `EventGridEventData`, `WebhookResponse`, `HealthResponse` |
-| `handlers/event_grid.py` | `POST /webhook/` — receives Event Grid deliveries, validates SAS key, dispatches to workflow |
-| `handlers/mock.py` | `POST /webhook/test` — mock endpoint (enabled when `VENDING_MOCK_MODE=true`) |
-| `extensions/` | Auto-discovered extension modules; each registers steps or event handlers at import time |
-| `extensions/_webhook_notify.py` | Built-in step: POST result to a plain HTTPS webhook |
-| `extensions/_api_notify.py` | Built-in step: POST result to a REST API with Bearer token auth |
-| `azure/management_groups.py` | Moves a subscription under a target management group |
-| `azure/notifications.py` | Publishes an outbound `ITL.SubscriptionVending.SubscriptionProvisioned` event to an Azure Event Grid Custom Topic after each provisioning workflow run (Step 6). Enabled only when `VENDING_EVENT_GRID_TOPIC_ENDPOINT` is set. |
-| `azure/rbac.py` | Creates initial RBAC role assignments on the subscription scope |
-| `azure/policy.py` | Assigns default Azure Policies; attaches the ITL Foundation Initiative via the Authorization service |
-| `azure/tags.py` | Reads subscription tags from Azure and converts them to a `SubscriptionConfig` dataclass |
+| `workflow/engine.py` | `WorkflowEngine` class — `run()` method orchestrates gates + built-in steps + custom steps + lifecycle events. Also exports backward-compat `run_provisioning_workflow()` wrapper. |
+| `workflow/steps.py` | Built-in provisioning steps 1–6, each decorated with `@register_step` |
+| `handlers/event_grid/` | `POST /webhook/` — receives Event Grid deliveries, validates SAS key, dispatches to `WorkflowEngine` |
+| `handlers/worker/` | `POST /worker/process-job` — dequeues and processes a `ProvisioningJob` from Azure Storage Queue |
+| `handlers/preflight/` | `POST /webhook/preflight` — dry-run plan: runs gates + simulates steps, no Azure mutations |
+| `handlers/replay/` | `POST /webhook/replay` — manually re-triggers the workflow for a given subscription ID |
+| `handlers/mock/` | `POST /webhook/test` — mock endpoint (enabled when `VENDING_MOCK_MODE=true`) |
+| `extensions/` | Auto-discovered extension modules; each self-registers at import time via module-level code |
+| `extensions/webhook_notify.py` | Optional step: POST result as JSON to a plain HTTPS webhook (`VENDING_WEBHOOK_URL`) |
+| `extensions/api_notify.py` | Optional step: POST result as JSON to a REST API with Bearer token auth (`VENDING_API_NOTIFY_URL`) |
+| `extensions/servicenow_check.py` | Optional gate: validate a ServiceNow ticket before provisioning starts (`VENDING_SNOW_INSTANCE`) |
+| `extensions/servicenow_feedback.py` | Optional step: PATCH the ServiceNow ticket with the provisioning outcome (`VENDING_SNOW_INSTANCE`) |
+| `infrastructure/azure/management_groups.py` | Moves a subscription under a target management group |
+| `infrastructure/azure/notifications.py` | Publishes an outbound `ITL.SubscriptionVending.SubscriptionProvisioned` event to an Azure Event Grid Custom Topic (Step 6). Enabled only when `VENDING_EVENT_GRID_TOPIC_ENDPOINT` is set. |
+| `infrastructure/azure/rbac.py` | Creates initial RBAC role assignments on the subscription scope |
+| `infrastructure/azure/policy.py` | Assigns default Azure Policies; attaches the ITL Foundation Initiative via the Authorization service |
+| `infrastructure/azure/tags.py` | Reads subscription tags from Azure and converts them to a `SubscriptionConfig` dataclass |
+| `infrastructure/azure/credential.py` | Selects `ClientSecretCredential` or `ManagedIdentityCredential` based on settings |
+| `infrastructure/queue/dispatcher.py` | Routes a completed/failed job to the configured retry strategy |
+| `infrastructure/queue/azure_queue.py` | Azure Storage Queue client — enqueue and dequeue `ProvisioningJob` messages |
 
 ### Azure infrastructure (`infra/`)
 

@@ -18,7 +18,7 @@ All steps — built-in (Steps 1–6) **and** custom steps from `extensions/` —
 
 ```python
 from subscription_vending.core.registry import register_step
-from subscription_vending.domain.context import StepContext
+from subscription_vending.core.context import StepContext
 from subscription_vending.workflow import STEP_RBAC
 
 @register_step(depends_on=[STEP_RBAC])   # runs after RBAC, before policy
@@ -26,8 +26,9 @@ async def my_step(ctx: StepContext) -> None:
     ...
 ```
 
-> `workflow.py` re-exports `register_step`, `register_gate`, and `StepContext` for backward compatibility.
-> New code should import from `core.registry` and `domain.context` directly.
+> `workflow/__init__.py` re-exports `register_step`, `register_gate`, `StepContext`, and all `STEP_*` constants for convenience.
+> `extensions/__init__.py` also re-exports them so extension authors can use `from subscription_vending.extensions import register_step, StepContext, STEP_RBAC`.
+> The canonical locations are `core.registry` and `core.context`.
 
 ### Step constants
 
@@ -40,7 +41,7 @@ async def my_step(ctx: StepContext) -> None:
 | `STEP_BUDGET` | Budget alert | `subscription_vending.workflow` |
 | `STEP_NOTIFY` | Outbound event publish | `subscription_vending.workflow` |
 
-All constants are also re-exported from `subscription_vending` directly.
+All constants are also re-exported from `subscription_vending.extensions` and `subscription_vending` directly.
 
 ---
 
@@ -52,7 +53,7 @@ A gate check is registered with `register_gate`. By default `stop_on_error=True`
 
 ```python
 from subscription_vending.core.registry import register_gate
-from subscription_vending.domain.context import StepContext
+from subscription_vending.core.context import StepContext
 
 @register_gate
 async def require_snow_ticket(ctx: StepContext) -> None:

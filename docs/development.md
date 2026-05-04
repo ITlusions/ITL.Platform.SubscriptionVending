@@ -85,36 +85,53 @@ The service is available at <http://localhost:8000>.
 ```
 src/subscription_vending/
 ├── main.py                  application factory, router registration
-├── config.py                Settings (Pydantic) + get_settings() @lru_cache singleton
-├── models.py                backward-compat re-export — use schemas/ for new code
-├── workflow.py              orchestrator: built-in steps 1–6, re-exports domain/core symbols
-│
-├── domain/
-│   └── context.py           StepContext, ProvisioningResult — pure dataclasses, no I/O
 │
 ├── core/
+│   ├── config.py            Settings (Pydantic) + get_settings() @lru_cache singleton
+│   ├── context.py           StepContext, ProvisioningResult — pure dataclasses, no I/O
+│   ├── job.py               ProvisioningJob — retry-queue payload
+│   ├── enums.py             RetryStrategy enum
 │   ├── base.py              BaseStep ABC — plugin contract
 │   ├── events.py            lifecycle event bus (STARTED / SUCCEEDED / FAILED / COMPLETED)
-│   ├── registry.py          step + gate registries, register_step(), register_gate(), toposort()
+│   ├── registry.py          step + gate registries, register_step(), register_gate(), _toposort()
 │   ├── protocols.py         Azure port contracts (typing.Protocol, @runtime_checkable)
 │   └── exceptions.py        typed exception hierarchy (AppError → ProvisioningError, etc.)
+│
+├── workflow/
+│   ├── engine.py            WorkflowEngine class; run_provisioning_workflow() backward-compat wrapper
+│   └── steps.py             built-in provisioning steps 1–6
 │
 ├── schemas/
 │   └── event_grid.py        HTTP schemas: EventGridEvent, WebhookResponse, HealthResponse
 │
-├── handlers/                FastAPI routers (driving adapters)
-├── retry/                   retry strategies: none / queue / dead_letter
-├── extensions/              auto-discovered plugins (self-register at import time)
-└── azure/                   Azure SDK calls (management groups, RBAC, policy, tags, notifications)
+├── handlers/                FastAPI routers (driving adapters), each as a sub-package
+│   ├── event_grid/          POST /webhook/
+│   ├── worker/              POST /worker/process-job
+│   ├── preflight/           POST /webhook/preflight
+│   ├── replay/              POST /webhook/replay
+│   └── mock/                POST /webhook/test (VENDING_MOCK_MODE)
+│
+├── infrastructure/          I/O adapters
+│   ├── azure/               Azure SDK calls (management groups, RBAC, policy, tags, notifications)
+│   └── queue/               retry dispatcher + Azure Storage Queue client
+│
+└── extensions/              auto-discovered plugins (self-register at import time)
+    ├── __init__.py          autodiscover() + re-exports for extension authors
+    ├── webhook_notify.py    optional: POST result to HTTPS webhook
+    ├── api_notify.py        optional: POST result to REST API (Bearer token)
+    ├── servicenow_check.py  optional gate: validate ServiceNow ticket before provisioning
+    └── servicenow_feedback.py  optional step: PATCH ServiceNow ticket with outcome
 ```
 
 ### Key conventions
 
-- Import `StepContext` / `ProvisioningResult` from `domain.context`; import `register_step` / `register_gate` from `core.registry`. The old `workflow` import paths still work (re-exported) but should not be used in new code.
-- Use `get_settings()` everywhere instead of `Settings()`. The singleton is cached after the first call.
-- New HTTP schemas go in `schemas/` — never in `domain/` or `core/`.
-- New Azure SDK calls go in `azure/` — never in `workflow.py` or `handlers/`.
+- Import `StepContext` / `ProvisioningResult` from `core.context`; import `register_step` / `register_gate` from `core.registry`. Both are also re-exported from `workflow` and `extensions` for convenience.
+- Use `get_settings()` everywhere instead of `Settings()`. The singleton is cached after the first call. The authoritative location is `core.config`.
+- New HTTP schemas go in `schemas/` — never in `core/`.
+- New Azure SDK calls go in `infrastructure/azure/` — never in `workflow/` or `handlers/`.
+- New retry/queue logic goes in `infrastructure/queue/` — never inline in handlers.
 - Raise typed exceptions from `core/exceptions.py` rather than appending plain strings to `ctx.result.errors` (the plain-string pattern is still supported for backward compatibility).
+- Extensions are active when their controlling env var is set. To write a new extension, create a `.py` file in `extensions/` — it will be auto-discovered at startup. Import everything you need from `subscription_vending.extensions` (re-exported there).
 
 ---
 
