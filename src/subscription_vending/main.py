@@ -1,19 +1,23 @@
+from __future__ import annotations
+
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
-from .config import get_settings
+
+from .core.config import get_settings
+from .extensions import autodiscover
 from .handlers.event_grid import router as event_grid_router
 from .handlers.mock import router as mock_router
 from .handlers.preflight import router as preflight_router
 from .handlers.replay import router as replay_router
 from .handlers.worker import router as worker_router
-from .extensions import autodiscover
 
 settings = get_settings()
-autodiscover()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    autodiscover()
     yield
 
 

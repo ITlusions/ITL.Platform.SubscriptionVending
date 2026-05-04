@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .domain.context import StepContext
+    from .context import StepContext
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def register_gate(
     Usage::
 
         from subscription_vending.core.registry import register_gate
-        from subscription_vending.domain.context import StepContext
+        from subscription_vending.core.context import StepContext
 
         @register_gate
         async def require_snow_ticket(ctx: StepContext) -> None:
@@ -96,7 +96,7 @@ def register_step(
     Usage (no dependencies)::
 
         from subscription_vending.core.registry import register_step
-        from subscription_vending.domain.context import StepContext
+        from subscription_vending.core.context import StepContext
 
         @register_step
         async def my_step(ctx: StepContext) -> None:

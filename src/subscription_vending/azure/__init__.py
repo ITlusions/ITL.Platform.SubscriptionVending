@@ -1,1 +1,0 @@
-"""Azure SDK helpers package."""
