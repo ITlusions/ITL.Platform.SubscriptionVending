@@ -208,8 +208,10 @@
     }
     .flow-arrow {
       display: flex;
-      align-items: center;
-      padding: 0 6px;
+      align-items: flex-start;
+      justify-content: center;
+      width: 40px;
+      flex-shrink: 0;
       padding-top: 22px;
       color: var(--muted);
       font-size: 1.2rem;
@@ -366,14 +368,90 @@
     footer a { color: var(--muted); }
     footer a:hover { color: var(--text); }
 
-    @media (max-width: 640px) {
+    /* ── Hamburger ─────────────────────────────────────── */
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 22px;
+      height: 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .nav-toggle span {
+      display: block;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .nav-toggle.open span:nth-child(2) { opacity: 0; }
+    .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    /* ── Responsive: tablet ──────────────────────────────── */
+    @media (max-width: 900px) {
+      .nav-links { gap: 1rem; font-size: 0.82rem; }
+      .hero { padding: 5rem 1.5rem 3.5rem; }
+    }
+
+    /* ── Responsive: mobile ──────────────────────────────── */
+    @media (max-width: 768px) {
       nav { padding: 0 1rem; }
-      .nav-links { display: none; }
-      .hero { padding: 4rem 1rem 3rem; }
-      .container { padding: 0 1rem; }
+      .nav-toggle { display: flex; }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 56px;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        gap: 0;
+        list-style: none;
+        background: rgba(13, 17, 23, 0.97);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border);
+        padding: 0.5rem 0;
+        z-index: 99;
+      }
+      .nav-links.open { display: flex; }
+      .nav-links li { width: 100%; }
+      .nav-links a {
+        display: block;
+        padding: 0.75rem 1.5rem;
+        color: var(--text);
+        font-size: 0.95rem;
+      }
+      .nav-links a:hover { background: var(--surface2); text-decoration: none; }
+
+      .hero { padding: 4rem 1.25rem 3rem; }
+      .hero-badge { flex-wrap: wrap; justify-content: center; }
+      .hero-actions { flex-direction: column; align-items: center; }
+      .btn { width: 100%; max-width: 280px; justify-content: center; }
+
+      .container { padding: 0 1.25rem; }
       section { padding: 3.5rem 0; }
+
       .flow { flex-direction: column; align-items: center; }
-      .flow-arrow { transform: rotate(90deg); padding: 4px 0; padding-left: 60px; }
+      .flow-node { width: 100%; max-width: 220px; }
+      .flow-arrow {
+        width: 40px;
+        height: 32px;
+        padding-top: 0;
+        align-items: center;
+        transform: rotate(90deg);
+      }
+    }
+
+    /* ── Responsive: small phone ─────────────────────────── */
+    @media (max-width: 480px) {
+      .hero h1 { font-size: 1.85rem; }
+      .badges { gap: 0.4rem; }
+      .badge-pill { font-size: 0.7rem; padding: 3px 10px; }
+      .step-card, .feature-card, .doc-link { padding: 1.25rem 1rem; }
     }
   </style>
 </head>
@@ -388,7 +466,10 @@
     </svg>
     ITL Subscription Vending
   </div>
-  <ul class="nav-links">
+  <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" id="nav-toggle">
+    <span></span><span></span><span></span>
+  </button>
+  <ul class="nav-links" id="nav-links">
     <li><a href="#how-it-works">How it works</a></li>
     <li><a href="#steps">Workflow</a></li>
     <li><a href="#features">Features</a></li>
@@ -402,7 +483,7 @@
 <header class="hero">
   <div class="hero-badge">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    Event-driven &middot; Zero-touch provisioning &middot; Retry strategies
+    Event-driven &middot; Zero-touch provisioning &middot; Extensible &middot; Retry strategies
   </div>
   <h1>Subscription Vending<br>on Autopilot</h1>
   <p>A FastAPI microservice that automatically provisions new Azure subscriptions the moment they are created — no manual steps, no drift.</p>
@@ -483,14 +564,14 @@
         <div class="step-card">
           <div class="step-num">Step 0</div>
           <div class="step-title">Read Subscription Tags</div>
-          <div class="step-desc">Reads metadata tags on the new subscription to parameterise all subsequent steps — management group target, budget limits, RBAC owners, and more.</div>
-          <span class="step-tag">itl-mgmt-group, itl-budget, itl-owner</span>
+          <div class="step-desc">Reads metadata tags on the new subscription to parameterise all subsequent steps &mdash; management group target, budget limits, owner e-mail, AKS flag, and ServiceNow ticket reference.</div>
+          <span class="step-tag">itl-environment, itl-budget, itl-owner</span>
         </div>
 
         <div class="step-card">
           <div class="step-num">Step 1</div>
           <div class="step-title">Move to Management Group</div>
-          <div class="step-desc">Moves the subscription to the target management group specified in the <code>itl-mgmt-group</code> tag, ensuring correct policy inheritance from day one.</div>
+          <div class="step-desc">Moves the subscription to the target management group determined by the <code>itl-environment</code> tag and the configurable environment-to-MG mapping, ensuring correct policy inheritance from day one.</div>
           <span class="step-tag">azure-mgmt-managementgroups</span>
         </div>
 
@@ -504,8 +585,8 @@
         <div class="step-card">
           <div class="step-num">Step 3</div>
           <div class="step-title">Create RBAC Role Assignments</div>
-          <div class="step-desc">Assigns Owner, Contributor, and Reader roles to principals configured in the subscription tags, granting the right teams immediate access.</div>
-          <span class="step-tag">azure-mgmt-authorization</span>
+          <div class="step-desc">Assigns Owner, Contributor, Security Reader, and Cost Management Reader roles to principals configured via environment variables, granting the right teams immediate access.</div>
+          <span class="step-tag">VENDING_*_OBJECT_ID env vars</span>
         </div>
 
         <div class="step-card">
@@ -558,8 +639,8 @@
         </div>
         <div class="feature-card">
           <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-          <div class="feature-title">Always returns 200</div>
-          <div class="feature-desc">Step failures are logged and surfaced in the response body but never cause Event Grid to retry the full payload.</div>
+          <div class="feature-title">No silent data loss</div>
+          <div class="feature-desc">Step failures are logged and included in the structured response. The retry strategy decides the HTTP status code &mdash; <code>none</code> always returns 200, <code>dead_letter</code> returns 500 on failure so Event Grid retries, <code>queue</code> offloads async.</div>
         </div>
         <div class="feature-card">
           <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
@@ -567,19 +648,19 @@
           <div class="feature-desc">All provisioning behaviour is controlled via subscription tags — no code changes needed for new subscriptions.</div>
         </div>
         <div class="feature-card">
+          <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+          <div class="feature-title">Auto-discovered extensions</div>
+          <div class="feature-desc">Drop a <code>.py</code> file in <code>extensions/</code> and it self-registers at startup. Built-in extensions include webhook notify, API notify, ServiceNow gate check, and ServiceNow feedback &mdash; all activated by env vars alone.</div>
+        </div>
+        <div class="feature-card">
           <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
           <div class="feature-title">Managed Identity auth</div>
-          <div class="feature-desc">Uses <code>azure-identity</code> DefaultAzureCredential — no secrets in environment variables, full support for Managed Identity and Workload Identity.</div>
+          <div class="feature-desc">Uses <code>azure-identity</code> &mdash; no secrets in environment variables. Supports Managed Identity, Workload Identity, and service principal credentials transparently.</div>
         </div>
         <div class="feature-card">
-          <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
-          <div class="feature-title">Container-ready</div>
-          <div class="feature-desc">Ships with a multi-stage Dockerfile. Deploy to AKS, Azure Container Apps, or any Kubernetes cluster with the included Helm values.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
-          <div class="feature-title">Automated versioning</div>
-          <div class="feature-desc">CI pipeline auto-bumps <code>pyproject.toml</code> version on every merge to <code>main</code> and tags the release in GitHub.</div>
+          <div class="feature-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/><line x1="19" y1="3" x2="19" y2="21"/></svg></div>
+          <div class="feature-title">Preflight dry-run</div>
+          <div class="feature-desc">Call <code>POST /webhook/preflight</code> to validate all gate checks and simulate every provisioning step against a real subscription &mdash; zero Azure mutations, full plan output returned.</div>
         </div>
       </div>
     </div>
@@ -700,6 +781,22 @@
 
 <script>
   document.getElementById("yr").textContent = new Date().getFullYear();
+
+  // Hamburger menu
+  const navToggle = document.getElementById("nav-toggle");
+  const navLinks  = document.getElementById("nav-links");
+  navToggle.addEventListener("click", () => {
+    const open = navLinks.classList.toggle("open");
+    navToggle.classList.toggle("open", open);
+    navToggle.setAttribute("aria-expanded", open);
+  });
+  navLinks.querySelectorAll("a").forEach(a => {
+    a.addEventListener("click", () => {
+      navLinks.classList.remove("open");
+      navToggle.classList.remove("open");
+      navToggle.setAttribute("aria-expanded", false);
+    });
+  });
 </script>
 
 </body>
