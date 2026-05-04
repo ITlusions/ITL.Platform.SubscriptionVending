@@ -246,6 +246,72 @@
       .main-layout { grid-template-columns: 1fr; }
       .resp-grid   { grid-template-columns: 1fr; }
     }
+
+    /* ── Hamburger ─────────────────────────────────────── */
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 22px;
+      height: 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .nav-toggle span {
+      display: block;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .nav-toggle.open span:nth-child(2) { opacity: 0; }
+    .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    /* ── Responsive: tablet ──────────────────────────────── */
+    @media (max-width: 900px) {
+      .nav-links { gap: 1rem; font-size: 0.82rem; }
+      .hero { padding: 3rem 1.5rem 2.5rem; }
+    }
+
+    /* ── Responsive: mobile ──────────────────────────────── */
+    @media (max-width: 768px) {
+      nav { padding: 0 1rem; }
+      .nav-toggle { display: flex; }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 56px;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        gap: 0;
+        background: rgba(13,17,23,0.97);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border);
+        padding: 0.5rem 0;
+        z-index: 99;
+      }
+      .nav-links.open { display: flex; }
+      .nav-links li { width: 100%; }
+      .nav-links a {
+        display: block;
+        padding: 0.75rem 1.5rem;
+        color: var(--text);
+        font-size: 0.95rem;
+      }
+      .nav-links a:hover { background: var(--surface2); text-decoration: none; }
+      .hero-controls { flex-direction: column; align-items: center; }
+    }
+
+    /* ── Responsive: small phone ─────────────────────────── */
+    @media (max-width: 480px) {
+      .hero h1 { font-size: 1.75rem; }
+      .panel-header { font-size: 0.72rem; }
+    }
   </style>
 </head>
 <body>
@@ -258,7 +324,10 @@
     </svg>
     ITL Subscription Vending
   </div>
-  <ul class="nav-links">
+  <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" id="nav-toggle">
+    <span></span><span></span><span></span>
+  </button>
+  <ul class="nav-links" id="nav-links">
     <li><a href="index.html">Home</a></li>
     <li><a href="architecture">Architecture</a></li>
     <li><a href="provisioning-workflow">Workflow</a></li>
@@ -929,6 +998,24 @@ function adRestart() {
 
 // -- Init ----------------------------------------------------------------------
 renderScenarioList(-1, {});
+
+// -- Hamburger menu ------------------------------------------------------------
+const navToggle = document.getElementById("nav-toggle");
+const navLinks  = document.getElementById("nav-links");
+if (navToggle && navLinks) {
+  navToggle.addEventListener("click", () => {
+    const open = navLinks.classList.toggle("open");
+    navToggle.classList.toggle("open", open);
+    navToggle.setAttribute("aria-expanded", open);
+  });
+  navLinks.querySelectorAll("a").forEach(a => {
+    a.addEventListener("click", () => {
+      navLinks.classList.remove("open");
+      navToggle.classList.remove("open");
+      navToggle.setAttribute("aria-expanded", false);
+    });
+  });
+}
 </script>
 </body>
 </html>

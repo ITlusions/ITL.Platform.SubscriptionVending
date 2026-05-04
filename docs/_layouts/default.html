@@ -255,12 +255,73 @@
     footer a { color: var(--accent2); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
 
-    /* ── RESPONSIVE ── */
-    @media (max-width: 640px) {
-      .nav-inner { height: auto; padding: 10px 16px; gap: 6px; }
+    /* ── HAMBURGER ── */
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 22px;
+      height: 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .nav-toggle span {
+      display: block;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .nav-toggle.open span:nth-child(2) { opacity: 0; }
+    .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    /* ── RESPONSIVE: tablet ── */
+    @media (max-width: 900px) {
+      .nav-links { gap: 2px; }
+      .nav-links a { padding: 4px 7px; font-size: 0.82rem; }
+    }
+
+    /* ── RESPONSIVE: mobile ── */
+    @media (max-width: 768px) {
+      nav { padding: 0 1rem; }
+      .nav-toggle { display: flex; }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 56px;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        gap: 0;
+        background: rgba(13, 17, 23, 0.97);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border);
+        padding: 0.5rem 0;
+        z-index: 99;
+      }
+      .nav-links.open { display: flex; }
+      .nav-links li { width: 100%; }
+      .nav-links a {
+        display: block;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0;
+        font-size: 0.95rem;
+        color: var(--text);
+      }
       .page-wrapper { padding: 32px 16px 60px; }
       .prose h1 { font-size: 1.5rem; }
       .prose h2 { font-size: 1.2rem; }
+    }
+
+    /* ── RESPONSIVE: small phone ── */
+    @media (max-width: 480px) {
+      .prose table { font-size: 0.8rem; }
+      .prose th, .prose td { padding: 8px 10px; }
+      .prose pre { padding: 14px; }
     }
   </style>
 </head>
@@ -274,7 +335,10 @@
     </svg>
     ITL Subscription Vending
   </a>
-  <ul class="nav-links">
+  <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" id="nav-toggle">
+    <span></span><span></span><span></span>
+  </button>
+  <ul class="nav-links" id="nav-links">
     <li><a href="{{ '/provisioning-workflow' | relative_url }}"{% if page.url contains 'provisioning-workflow' %} class="active"{% endif %}>Workflow</a></li>
     <li><a href="{{ '/architecture' | relative_url }}"{% if page.url contains 'architecture' %} class="active"{% endif %}>Architecture</a></li>
     <li><a href="{{ '/api' | relative_url }}"{% if page.url contains '/api' %} class="active"{% endif %}>API</a></li>
@@ -299,5 +363,23 @@
   &nbsp;·&nbsp; Built with Jekyll
 </footer>
 
+<script>
+  const navToggle = document.getElementById("nav-toggle");
+  const navLinks  = document.getElementById("nav-links");
+  if (navToggle && navLinks) {
+    navToggle.addEventListener("click", () => {
+      const open = navLinks.classList.toggle("open");
+      navToggle.classList.toggle("open", open);
+      navToggle.setAttribute("aria-expanded", open);
+    });
+    navLinks.querySelectorAll("a").forEach(a => {
+      a.addEventListener("click", () => {
+        navLinks.classList.remove("open");
+        navToggle.classList.remove("open");
+        navToggle.setAttribute("aria-expanded", false);
+      });
+    });
+  }
+</script>
 </body>
 </html>
