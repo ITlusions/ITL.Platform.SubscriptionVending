@@ -16,8 +16,8 @@ from subscription_vending.workflow import (  # noqa: E402
     register_gate,
     run_provisioning_workflow,
 )
-from subscription_vending.config import Settings  # noqa: E402
-from subscription_vending.azure.tags import SubscriptionConfig  # noqa: E402
+from subscription_vending.core.config import Settings  # noqa: E402
+from subscription_vending.infrastructure.azure.tags import SubscriptionConfig  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -62,17 +62,17 @@ def _make_ctx(snow_ticket: str = "", dry_run: bool = False) -> StepContext:
 
 _PATCH_ALL = dict(
     read_sub=patch(
-        "subscription_vending.workflow.read_subscription_config",
+        "subscription_vending.workflow.engine.read_subscription_config",
         AsyncMock(return_value=_make_config()),
     ),
-    move_mg=patch("subscription_vending.workflow.move_subscription_to_management_group", AsyncMock()),
+    move_mg=patch("subscription_vending.workflow.steps.move_subscription_to_management_group", AsyncMock()),
     initiative=patch(
-        "subscription_vending.workflow.attach_foundation_initiative", AsyncMock(return_value="")
+        "subscription_vending.workflow.steps.attach_foundation_initiative", AsyncMock(return_value="")
     ),
-    rbac=patch("subscription_vending.workflow.create_initial_rbac", AsyncMock(return_value=[])),
-    policy=patch("subscription_vending.workflow.assign_default_policies", AsyncMock()),
+    rbac=patch("subscription_vending.workflow.steps.create_initial_rbac", AsyncMock(return_value=[])),
+    policy=patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
     cred=patch(
-        "subscription_vending.azure.management_groups._get_credential", return_value=MagicMock()
+        "subscription_vending.workflow.engine._get_credential", return_value=MagicMock()
     ),
 )
 
@@ -141,15 +141,15 @@ async def test_gate_runs_before_workflow_steps():
         call_order.append("gate")
 
     with (
-        patch("subscription_vending.workflow.read_subscription_config", AsyncMock(return_value=_make_config())),
+        patch("subscription_vending.workflow.engine.read_subscription_config", AsyncMock(return_value=_make_config())),
         patch(
-            "subscription_vending.workflow.move_subscription_to_management_group",
+            "subscription_vending.workflow.steps.move_subscription_to_management_group",
             AsyncMock(side_effect=lambda **kw: call_order.append("step")),
         ),
-        patch("subscription_vending.workflow.attach_foundation_initiative", AsyncMock(return_value="")),
-        patch("subscription_vending.workflow.create_initial_rbac", AsyncMock(return_value=[])),
-        patch("subscription_vending.workflow.assign_default_policies", AsyncMock()),
-        patch("subscription_vending.azure.management_groups._get_credential", return_value=MagicMock()),
+        patch("subscription_vending.workflow.steps.attach_foundation_initiative", AsyncMock(return_value="")),
+        patch("subscription_vending.workflow.steps.create_initial_rbac", AsyncMock(return_value=[])),
+        patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
+        patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
         await run_provisioning_workflow(
             subscription_id="sub-1",
@@ -176,12 +176,12 @@ async def test_gate_failure_with_stop_on_error_skips_all_steps():
         step_called = True
 
     with (
-        patch("subscription_vending.workflow.read_subscription_config", AsyncMock(return_value=_make_config())),
-        patch("subscription_vending.workflow.move_subscription_to_management_group", AsyncMock(side_effect=_should_not_run)),
-        patch("subscription_vending.workflow.attach_foundation_initiative", AsyncMock(return_value="")),
-        patch("subscription_vending.workflow.create_initial_rbac", AsyncMock(return_value=[])),
-        patch("subscription_vending.workflow.assign_default_policies", AsyncMock()),
-        patch("subscription_vending.azure.management_groups._get_credential", return_value=MagicMock()),
+        patch("subscription_vending.workflow.engine.read_subscription_config", AsyncMock(return_value=_make_config())),
+        patch("subscription_vending.workflow.steps.move_subscription_to_management_group", AsyncMock(side_effect=_should_not_run)),
+        patch("subscription_vending.workflow.steps.attach_foundation_initiative", AsyncMock(return_value="")),
+        patch("subscription_vending.workflow.steps.create_initial_rbac", AsyncMock(return_value=[])),
+        patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
+        patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
         result = await run_provisioning_workflow(
             subscription_id="sub-1",
@@ -204,12 +204,12 @@ async def test_gate_failure_without_stop_on_error_continues_steps():
         ctx.result.errors.append("Soft gate warning")
 
     with (
-        patch("subscription_vending.workflow.read_subscription_config", AsyncMock(return_value=_make_config())),
-        patch("subscription_vending.workflow.move_subscription_to_management_group", AsyncMock()),
-        patch("subscription_vending.workflow.attach_foundation_initiative", AsyncMock(return_value="init-1")),
-        patch("subscription_vending.workflow.create_initial_rbac", AsyncMock(return_value=["r1"])),
-        patch("subscription_vending.workflow.assign_default_policies", AsyncMock()),
-        patch("subscription_vending.azure.management_groups._get_credential", return_value=MagicMock()),
+        patch("subscription_vending.workflow.engine.read_subscription_config", AsyncMock(return_value=_make_config())),
+        patch("subscription_vending.workflow.steps.move_subscription_to_management_group", AsyncMock()),
+        patch("subscription_vending.workflow.steps.attach_foundation_initiative", AsyncMock(return_value="init-1")),
+        patch("subscription_vending.workflow.steps.create_initial_rbac", AsyncMock(return_value=["r1"])),
+        patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
+        patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
         result = await run_provisioning_workflow(
             subscription_id="sub-1",
@@ -232,7 +232,7 @@ async def test_gate_failure_without_stop_on_error_continues_steps():
 @pytest.mark.asyncio
 async def test_snow_gate_skips_when_no_instance():
     """When instance is empty, gate is a no-op (integration not configured)."""
-    from subscription_vending.extensions._servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
 
     gate = ServiceNowCheckGate(instance="", user="u", password="p")
     ctx = _make_ctx(snow_ticket="RITM0001234")
@@ -244,7 +244,7 @@ async def test_snow_gate_skips_when_no_instance():
 @pytest.mark.asyncio
 async def test_snow_gate_fails_when_no_ticket_on_subscription():
     """When SNOW is configured but no ticket tag on subscription, gate fails."""
-    from subscription_vending.extensions._servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
 
     gate = ServiceNowCheckGate(instance="myco.service-now.com", user="u", password="p")
     ctx = _make_ctx(snow_ticket="")
@@ -262,7 +262,7 @@ async def test_snow_gate_dry_run_still_validates_ticket():
     that preflight dry-runs give accurate feedback about whether the ticket
     is present and approved.
     """
-    from subscription_vending.extensions._servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
 
     gate = ServiceNowCheckGate(instance="myco.service-now.com", user="u", password="p")
     ctx = _make_ctx(snow_ticket="RITM0001234", dry_run=True)
@@ -292,7 +292,7 @@ async def test_snow_gate_dry_run_still_validates_ticket():
 async def test_snow_gate_passes_when_ticket_approved():
     """Gate passes when ServiceNow returns an approved ticket."""
     import httpx  # noqa: PLC0415
-    from subscription_vending.extensions._servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
 
     gate = ServiceNowCheckGate(instance="myco.service-now.com", user="u", password="p")
     ctx = _make_ctx(snow_ticket="RITM0001234")
@@ -316,7 +316,7 @@ async def test_snow_gate_passes_when_ticket_approved():
 @pytest.mark.asyncio
 async def test_snow_gate_fails_when_ticket_not_found():
     """Gate fails when ServiceNow returns an empty result set."""
-    from subscription_vending.extensions._servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
 
     gate = ServiceNowCheckGate(instance="myco.service-now.com", user="u", password="p")
     ctx = _make_ctx(snow_ticket="RITM9999999")
@@ -339,7 +339,7 @@ async def test_snow_gate_fails_when_ticket_not_found():
 @pytest.mark.asyncio
 async def test_snow_gate_fails_when_ticket_not_approved():
     """Gate fails when ticket exists but is not in the required state."""
-    from subscription_vending.extensions._servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
 
     gate = ServiceNowCheckGate(
         instance="myco.service-now.com", user="u", password="p", require_state="approved"
@@ -367,7 +367,7 @@ async def test_snow_gate_fails_when_ticket_not_approved():
 @pytest.mark.asyncio
 async def test_snow_gate_skips_state_check_when_require_state_empty():
     """When require_state is empty, existence check only — state is not validated."""
-    from subscription_vending.extensions._servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
 
     gate = ServiceNowCheckGate(
         instance="myco.service-now.com", user="u", password="p", require_state=""
@@ -394,7 +394,7 @@ async def test_snow_gate_skips_state_check_when_require_state_empty():
 async def test_snow_gate_records_error_on_http_failure():
     """Network/HTTP errors are caught and recorded in result.errors."""
     import httpx  # noqa: PLC0415
-    from subscription_vending.extensions._servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_check import ServiceNowCheckGate  # noqa: PLC0415
 
     gate = ServiceNowCheckGate(instance="myco.service-now.com", user="u", password="p")
     ctx = _make_ctx(snow_ticket="RITM0001234")
@@ -437,7 +437,7 @@ def _make_feedback_client(sys_id: str = "abc123", patch_status: int = 200):
 @pytest.mark.asyncio
 async def test_feedback_skips_when_no_instance():
     """When instance is empty the step is a no-op."""
-    from subscription_vending.extensions._servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
 
     step = ServiceNowFeedbackStep(instance="", user="u", password="p")
     ctx = _make_ctx(snow_ticket="RITM0001234")
@@ -452,7 +452,7 @@ async def test_feedback_skips_when_no_instance():
 @pytest.mark.asyncio
 async def test_feedback_skips_when_no_ticket():
     """When subscription has no ticket tag the step logs and returns."""
-    from subscription_vending.extensions._servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
 
     step = ServiceNowFeedbackStep(instance="myco.service-now.com", user="u", password="p")
     ctx = _make_ctx(snow_ticket="")
@@ -467,7 +467,7 @@ async def test_feedback_skips_when_no_ticket():
 @pytest.mark.asyncio
 async def test_feedback_dry_run_skips_http():
     """In dry-run mode the step logs what it would do without making HTTP calls."""
-    from subscription_vending.extensions._servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
 
     step = ServiceNowFeedbackStep(instance="myco.service-now.com", user="u", password="p")
     ctx = _make_ctx(snow_ticket="RITM0001234", dry_run=True)
@@ -482,7 +482,7 @@ async def test_feedback_dry_run_skips_http():
 @pytest.mark.asyncio
 async def test_feedback_patches_ticket_on_success():
     """On success the step PATCHes the ticket with work_notes."""
-    from subscription_vending.extensions._servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
 
     step = ServiceNowFeedbackStep(
         instance="myco.service-now.com", user="u", password="p", success_state="3"
@@ -505,7 +505,7 @@ async def test_feedback_patches_ticket_on_success():
 @pytest.mark.asyncio
 async def test_feedback_patches_ticket_on_failure():
     """On failure the step PATCHes with error summary in work_notes."""
-    from subscription_vending.extensions._servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
 
     step = ServiceNowFeedbackStep(
         instance="myco.service-now.com", user="u", password="p", failure_state="4"
@@ -528,7 +528,7 @@ async def test_feedback_patches_ticket_on_failure():
 @pytest.mark.asyncio
 async def test_feedback_omits_state_when_not_configured():
     """When success_state is empty, the PATCH payload does not contain 'state'."""
-    from subscription_vending.extensions._servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
 
     step = ServiceNowFeedbackStep(
         instance="myco.service-now.com", user="u", password="p",
@@ -547,7 +547,7 @@ async def test_feedback_omits_state_when_not_configured():
 @pytest.mark.asyncio
 async def test_feedback_skips_update_when_ticket_not_found():
     """When sys_id lookup returns empty, no PATCH is made."""
-    from subscription_vending.extensions._servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
 
     step = ServiceNowFeedbackStep(instance="myco.service-now.com", user="u", password="p")
     ctx = _make_ctx(snow_ticket="RITM9999999")
@@ -574,7 +574,7 @@ async def test_feedback_skips_update_when_ticket_not_found():
 async def test_feedback_patch_failure_is_non_fatal():
     """HTTP error during PATCH is logged but does not append to result.errors."""
     import httpx  # noqa: PLC0415
-    from subscription_vending.extensions._servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
+    from subscription_vending.extensions.servicenow_feedback import ServiceNowFeedbackStep  # noqa: PLC0415
 
     step = ServiceNowFeedbackStep(instance="myco.service-now.com", user="u", password="p")
     ctx = _make_ctx(snow_ticket="RITM0001234")

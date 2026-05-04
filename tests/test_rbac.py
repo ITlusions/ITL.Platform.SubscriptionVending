@@ -10,13 +10,13 @@ import pytest
 
 os.environ.setdefault("VENDING_AZURE_TENANT_ID", "test-tenant-id")
 
-from subscription_vending.azure.rbac import (  # noqa: E402
+from subscription_vending.infrastructure.azure.rbac import (  # noqa: E402
     ROLE_DEFINITIONS,
     RoleAssignmentSpec,
     _get_default_role_assignments,
     create_initial_rbac,
 )
-from subscription_vending.config import Settings  # noqa: E402
+from subscription_vending.core.config import Settings  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -95,8 +95,8 @@ def test_all_four_principals_returned_when_fully_configured():
 @pytest.mark.asyncio
 async def test_create_initial_rbac_returns_empty_when_no_object_ids():
     settings = _make_settings()
-    with patch("subscription_vending.azure.rbac._get_credential"):
-        with patch("subscription_vending.azure.rbac.AuthorizationManagementClient"):
+    with patch("subscription_vending.infrastructure.azure.rbac._get_credential"):
+        with patch("subscription_vending.infrastructure.azure.rbac.AuthorizationManagementClient"):
             result = await create_initial_rbac(
                 subscription_id="sub-123",
                 settings=settings,
@@ -121,9 +121,9 @@ async def test_create_initial_rbac_calls_sdk_for_each_principal():
         _fake_assignment("/assignments/4"),
     ]
 
-    with patch("subscription_vending.azure.rbac._get_credential"):
+    with patch("subscription_vending.infrastructure.azure.rbac._get_credential"):
         with patch(
-            "subscription_vending.azure.rbac.AuthorizationManagementClient",
+            "subscription_vending.infrastructure.azure.rbac.AuthorizationManagementClient",
             return_value=mock_client,
         ):
             result = await create_initial_rbac(
@@ -165,9 +165,9 @@ async def test_create_initial_rbac_uses_correct_role_definition_ids():
         _fake_assignment("/assignments/secreader"),
     ]
 
-    with patch("subscription_vending.azure.rbac._get_credential"):
+    with patch("subscription_vending.infrastructure.azure.rbac._get_credential"):
         with patch(
-            "subscription_vending.azure.rbac.AuthorizationManagementClient",
+            "subscription_vending.infrastructure.azure.rbac.AuthorizationManagementClient",
             return_value=mock_client,
         ):
             await create_initial_rbac(subscription_id="sub-123", settings=settings)
@@ -201,12 +201,12 @@ async def test_create_initial_rbac_logs_warning_on_error_and_continues(caplog):
 
     import logging
 
-    with patch("subscription_vending.azure.rbac._get_credential"):
+    with patch("subscription_vending.infrastructure.azure.rbac._get_credential"):
         with patch(
-            "subscription_vending.azure.rbac.AuthorizationManagementClient",
+            "subscription_vending.infrastructure.azure.rbac.AuthorizationManagementClient",
             return_value=mock_client,
         ):
-            with caplog.at_level(logging.WARNING, logger="subscription_vending.azure.rbac"):
+            with caplog.at_level(logging.WARNING, logger="subscription_vending.infrastructure.azure.rbac"):
                 result = await create_initial_rbac(
                     subscription_id="sub-123",
                     settings=settings,
@@ -233,9 +233,9 @@ async def test_create_initial_rbac_returns_only_successful_ids():
         _fake_assignment("/assignments/sec"),
     ]
 
-    with patch("subscription_vending.azure.rbac._get_credential"):
+    with patch("subscription_vending.infrastructure.azure.rbac._get_credential"):
         with patch(
-            "subscription_vending.azure.rbac.AuthorizationManagementClient",
+            "subscription_vending.infrastructure.azure.rbac.AuthorizationManagementClient",
             return_value=mock_client,
         ):
             result = await create_initial_rbac(

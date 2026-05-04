@@ -6,7 +6,7 @@ import pytest
 os.environ.setdefault("VENDING_AZURE_TENANT_ID", "test-tenant-id")
 
 from subscription_vending.handlers import event_grid
-from subscription_vending.models import EventGridEvent
+from subscription_vending.schemas.event_grid import EventGridEvent
 
 
 @pytest.fixture()
@@ -76,7 +76,7 @@ def test_workflow_error_is_logged_and_not_reraised(client, monkeypatch, caplog):
     async def _failing_dispatch(**kwargs):  # noqa: ARG001
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(event_grid, "dispatch", _failing_dispatch)
+    monkeypatch.setattr(event_grid.controller, "dispatch", _failing_dispatch)
 
     with caplog.at_level(logging.ERROR):
         response = client.post("/webhook/", json=[_subscription_created_event()])
@@ -96,7 +96,7 @@ def test_batch_of_events_is_processed(client, monkeypatch):
         r = ProvisioningResult(subscription_id=subscription_id)
         return r, False
 
-    monkeypatch.setattr(event_grid, "dispatch", _fake_dispatch)
+    monkeypatch.setattr(event_grid.controller, "dispatch", _fake_dispatch)
 
     response = client.post(
         "/webhook/",

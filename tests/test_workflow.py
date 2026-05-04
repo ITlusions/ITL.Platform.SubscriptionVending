@@ -10,7 +10,7 @@ import pytest
 os.environ.setdefault("VENDING_AZURE_TENANT_ID", "test-tenant-id")
 
 from subscription_vending.workflow import ProvisioningResult, run_provisioning_workflow  # noqa: E402
-from subscription_vending.config import Settings  # noqa: E402
+from subscription_vending.core.config import Settings  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ def test_provisioning_result_defaults():
 
 @pytest.mark.asyncio
 async def test_attach_foundation_initiative_returns_initiative_id():
-    from subscription_vending.azure.policy import attach_foundation_initiative  # noqa: PLC0415
+    from subscription_vending.infrastructure.azure.policy import attach_foundation_initiative  # noqa: PLC0415
 
     mock_response = MagicMock()
     mock_response.json.return_value = {"initiative_id": "init-abc"}
@@ -82,7 +82,7 @@ async def test_attach_foundation_initiative_returns_initiative_id():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(return_value=mock_response)
 
-    with patch("subscription_vending.azure.policy.httpx.AsyncClient", return_value=mock_client):
+    with patch("subscription_vending.infrastructure.azure.policy.httpx.AsyncClient", return_value=mock_client):
         result = await attach_foundation_initiative(
             authorization_url="http://auth-service:8004",
             subscription_id="sub-1",
@@ -97,7 +97,7 @@ async def test_attach_foundation_initiative_returns_initiative_id():
 
 @pytest.mark.asyncio
 async def test_attach_foundation_initiative_returns_empty_when_no_initiative_id():
-    from subscription_vending.azure.policy import attach_foundation_initiative  # noqa: PLC0415
+    from subscription_vending.infrastructure.azure.policy import attach_foundation_initiative  # noqa: PLC0415
 
     mock_response = MagicMock()
     mock_response.json.return_value = {}
@@ -108,7 +108,7 @@ async def test_attach_foundation_initiative_returns_empty_when_no_initiative_id(
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(return_value=mock_response)
 
-    with patch("subscription_vending.azure.policy.httpx.AsyncClient", return_value=mock_client):
+    with patch("subscription_vending.infrastructure.azure.policy.httpx.AsyncClient", return_value=mock_client):
         result = await attach_foundation_initiative(
             authorization_url="http://auth-service:8004",
             subscription_id="sub-1",
@@ -120,7 +120,7 @@ async def test_attach_foundation_initiative_returns_empty_when_no_initiative_id(
 @pytest.mark.asyncio
 async def test_attach_foundation_initiative_raises_on_http_error():
     import httpx  # noqa: PLC0415
-    from subscription_vending.azure.policy import attach_foundation_initiative  # noqa: PLC0415
+    from subscription_vending.infrastructure.azure.policy import attach_foundation_initiative  # noqa: PLC0415
 
     mock_response = MagicMock()
     mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
@@ -134,7 +134,7 @@ async def test_attach_foundation_initiative_raises_on_http_error():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.post = AsyncMock(return_value=mock_response)
 
-    with patch("subscription_vending.azure.policy.httpx.AsyncClient", return_value=mock_client):
+    with patch("subscription_vending.infrastructure.azure.policy.httpx.AsyncClient", return_value=mock_client):
         with pytest.raises(httpx.HTTPStatusError):
             await attach_foundation_initiative(
                 authorization_url="http://auth-service:8004",
@@ -152,12 +152,12 @@ async def test_workflow_returns_provisioning_result():
     config = _make_subscription_config()
 
     with (
-        patch("subscription_vending.workflow.read_subscription_config", AsyncMock(return_value=config)),
-        patch("subscription_vending.workflow.move_subscription_to_management_group", AsyncMock()),
-        patch("subscription_vending.workflow.attach_foundation_initiative", AsyncMock(return_value="init-xyz")),
-        patch("subscription_vending.workflow.create_initial_rbac", AsyncMock(return_value=["role-1"])),
-        patch("subscription_vending.workflow.assign_default_policies", AsyncMock()),
-        patch("subscription_vending.azure.management_groups._get_credential", return_value=MagicMock()),
+        patch("subscription_vending.workflow.engine.read_subscription_config", AsyncMock(return_value=config)),
+        patch("subscription_vending.workflow.steps.move_subscription_to_management_group", AsyncMock()),
+        patch("subscription_vending.workflow.steps.attach_foundation_initiative", AsyncMock(return_value="init-xyz")),
+        patch("subscription_vending.workflow.steps.create_initial_rbac", AsyncMock(return_value=["role-1"])),
+        patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
+        patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
         result = await run_provisioning_workflow(
             subscription_id="sub-1",
@@ -180,15 +180,15 @@ async def test_workflow_mg_step_error_collected_without_stopping():
     config = _make_subscription_config()
 
     with (
-        patch("subscription_vending.workflow.read_subscription_config", AsyncMock(return_value=config)),
+        patch("subscription_vending.workflow.engine.read_subscription_config", AsyncMock(return_value=config)),
         patch(
-            "subscription_vending.workflow.move_subscription_to_management_group",
+            "subscription_vending.workflow.steps.move_subscription_to_management_group",
             AsyncMock(side_effect=RuntimeError("mg boom")),
         ),
-        patch("subscription_vending.workflow.attach_foundation_initiative", AsyncMock(return_value="init-xyz")),
-        patch("subscription_vending.workflow.create_initial_rbac", AsyncMock(return_value=[])),
-        patch("subscription_vending.workflow.assign_default_policies", AsyncMock()),
-        patch("subscription_vending.azure.management_groups._get_credential", return_value=MagicMock()),
+        patch("subscription_vending.workflow.steps.attach_foundation_initiative", AsyncMock(return_value="init-xyz")),
+        patch("subscription_vending.workflow.steps.create_initial_rbac", AsyncMock(return_value=[])),
+        patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
+        patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
         result = await run_provisioning_workflow(
             subscription_id="sub-1",
@@ -209,15 +209,15 @@ async def test_workflow_foundation_initiative_error_collected_without_stopping()
     config = _make_subscription_config()
 
     with (
-        patch("subscription_vending.workflow.read_subscription_config", AsyncMock(return_value=config)),
-        patch("subscription_vending.workflow.move_subscription_to_management_group", AsyncMock()),
+        patch("subscription_vending.workflow.engine.read_subscription_config", AsyncMock(return_value=config)),
+        patch("subscription_vending.workflow.steps.move_subscription_to_management_group", AsyncMock()),
         patch(
-            "subscription_vending.workflow.attach_foundation_initiative",
+            "subscription_vending.workflow.steps.attach_foundation_initiative",
             AsyncMock(side_effect=RuntimeError("initiative boom")),
         ),
-        patch("subscription_vending.workflow.create_initial_rbac", AsyncMock(return_value=["role-1"])),
-        patch("subscription_vending.workflow.assign_default_policies", AsyncMock()),
-        patch("subscription_vending.azure.management_groups._get_credential", return_value=MagicMock()),
+        patch("subscription_vending.workflow.steps.create_initial_rbac", AsyncMock(return_value=["role-1"])),
+        patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
+        patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
         result = await run_provisioning_workflow(
             subscription_id="sub-1",
@@ -238,15 +238,15 @@ async def test_workflow_rbac_error_collected_without_stopping():
     config = _make_subscription_config()
 
     with (
-        patch("subscription_vending.workflow.read_subscription_config", AsyncMock(return_value=config)),
-        patch("subscription_vending.workflow.move_subscription_to_management_group", AsyncMock()),
-        patch("subscription_vending.workflow.attach_foundation_initiative", AsyncMock(return_value="")),
+        patch("subscription_vending.workflow.engine.read_subscription_config", AsyncMock(return_value=config)),
+        patch("subscription_vending.workflow.steps.move_subscription_to_management_group", AsyncMock()),
+        patch("subscription_vending.workflow.steps.attach_foundation_initiative", AsyncMock(return_value="")),
         patch(
-            "subscription_vending.workflow.create_initial_rbac",
+            "subscription_vending.workflow.steps.create_initial_rbac",
             AsyncMock(side_effect=RuntimeError("rbac boom")),
         ),
-        patch("subscription_vending.workflow.assign_default_policies", AsyncMock()),
-        patch("subscription_vending.azure.management_groups._get_credential", return_value=MagicMock()),
+        patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
+        patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
         result = await run_provisioning_workflow(
             subscription_id="sub-1",
@@ -270,12 +270,12 @@ async def test_workflow_management_group_set_from_settings_root():
         captured_mg.append(kwargs["management_group_id"])
 
     with (
-        patch("subscription_vending.workflow.read_subscription_config", AsyncMock(return_value=config)),
-        patch("subscription_vending.workflow.move_subscription_to_management_group", _capture_mg),
-        patch("subscription_vending.workflow.attach_foundation_initiative", AsyncMock(return_value="")),
-        patch("subscription_vending.workflow.create_initial_rbac", AsyncMock(return_value=[])),
-        patch("subscription_vending.workflow.assign_default_policies", AsyncMock()),
-        patch("subscription_vending.azure.management_groups._get_credential", return_value=MagicMock()),
+        patch("subscription_vending.workflow.engine.read_subscription_config", AsyncMock(return_value=config)),
+        patch("subscription_vending.workflow.steps.move_subscription_to_management_group", _capture_mg),
+        patch("subscription_vending.workflow.steps.attach_foundation_initiative", AsyncMock(return_value="")),
+        patch("subscription_vending.workflow.steps.create_initial_rbac", AsyncMock(return_value=[])),
+        patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
+        patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
         result = await run_provisioning_workflow(
             subscription_id="sub-1",

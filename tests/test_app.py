@@ -58,10 +58,11 @@ def test_mock_router_loaded_in_mock_mode(monkeypatch):
 
     # Re-import so settings are re-evaluated
     import importlib
-    import subscription_vending.config as cfg_mod
+    import subscription_vending.core.config as core_cfg_mod
     import subscription_vending.main as main_mod
 
-    importlib.reload(cfg_mod)
+    importlib.reload(core_cfg_mod)
+    core_cfg_mod.get_settings.cache_clear()
     importlib.reload(main_mod)
 
     from fastapi.testclient import TestClient

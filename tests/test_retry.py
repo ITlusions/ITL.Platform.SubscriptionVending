@@ -11,8 +11,9 @@ import pytest
 
 os.environ.setdefault("VENDING_AZURE_TENANT_ID", "test-tenant-id")
 
-from subscription_vending.config import Settings  # noqa: E402
-from subscription_vending.retry.models import ProvisioningJob  # noqa: E402
+from subscription_vending.core.config import Settings  # noqa: E402
+from subscription_vending.core.enums import RetryStrategy  # noqa: E402
+from subscription_vending.core.job import ProvisioningJob  # noqa: E402
 from subscription_vending.workflow import ProvisioningResult  # noqa: E402
 
 
@@ -75,10 +76,10 @@ class TestDispatcherNone:
         result = _make_result()
 
         with patch(
-            "subscription_vending.retry.dispatcher.run_provisioning_workflow",
+            "subscription_vending.workflow.engine.WorkflowEngine.run",
             new=AsyncMock(return_value=result),
         ) as mock_run:
-            from subscription_vending.retry.dispatcher import dispatch
+            from subscription_vending.infrastructure.queue.dispatcher import dispatch
 
             out_result, should_error = await dispatch(
                 subscription_id="sub-123",
@@ -96,10 +97,10 @@ class TestDispatcherNone:
         result = _make_result(errors=["something failed"])
 
         with patch(
-            "subscription_vending.retry.dispatcher.run_provisioning_workflow",
+            "subscription_vending.workflow.engine.WorkflowEngine.run",
             new=AsyncMock(return_value=result),
         ):
-            from subscription_vending.retry.dispatcher import dispatch
+            from subscription_vending.infrastructure.queue.dispatcher import dispatch
 
             _, should_error = await dispatch("sub-123", "", "", settings)
             assert should_error is False
@@ -116,10 +117,10 @@ class TestDispatcherDeadLetter:
         result = _make_result(errors=["rbac failed"])
 
         with patch(
-            "subscription_vending.retry.dispatcher.run_provisioning_workflow",
+            "subscription_vending.workflow.engine.WorkflowEngine.run",
             new=AsyncMock(return_value=result),
         ):
-            from subscription_vending.retry.dispatcher import dispatch
+            from subscription_vending.infrastructure.queue.dispatcher import dispatch
 
             _, should_error = await dispatch("sub-123", "", "", settings)
             assert should_error is True
@@ -130,10 +131,10 @@ class TestDispatcherDeadLetter:
         result = _make_result()
 
         with patch(
-            "subscription_vending.retry.dispatcher.run_provisioning_workflow",
+            "subscription_vending.workflow.engine.WorkflowEngine.run",
             new=AsyncMock(return_value=result),
         ):
-            from subscription_vending.retry.dispatcher import dispatch
+            from subscription_vending.infrastructure.queue.dispatcher import dispatch
 
             _, should_error = await dispatch("sub-123", "", "", settings)
             assert should_error is False
@@ -153,11 +154,11 @@ class TestDispatcherQueue:
             provisioning_dlq_name="prov-jobs-dlq",
         )
 
-        with patch("subscription_vending.retry.dispatcher.ensure_queues_exist") as mock_ensure, \
-             patch("subscription_vending.retry.dispatcher.enqueue_job") as mock_enqueue, \
-             patch("subscription_vending.retry.dispatcher._queues_ensured", False):
+        with patch("subscription_vending.infrastructure.queue.dispatcher.ensure_queues_exist") as mock_ensure, \
+             patch("subscription_vending.infrastructure.queue.dispatcher.enqueue_job") as mock_enqueue, \
+             patch("subscription_vending.infrastructure.queue.dispatcher._queues_ensured", False):
 
-            from subscription_vending.retry import dispatcher as disp
+            from subscription_vending.infrastructure.queue import dispatcher as disp
             disp._queues_ensured = False
 
             out_result, should_error = await disp.dispatch("sub-123", "my-sub", "ITL-Dev", settings)
@@ -178,10 +179,10 @@ class TestDispatcherQueue:
         result = _make_result()
 
         with patch(
-            "subscription_vending.retry.dispatcher.run_provisioning_workflow",
+            "subscription_vending.workflow.engine.WorkflowEngine.run",
             new=AsyncMock(return_value=result),
         ) as mock_run:
-            from subscription_vending.retry.dispatcher import dispatch
+            from subscription_vending.infrastructure.queue.dispatcher import dispatch
 
             out_result, _ = await dispatch("sub-123", "", "", settings)
             mock_run.assert_awaited_once()
@@ -210,10 +211,10 @@ class TestWorkerHandler:
         result = _make_result()
 
         with patch(
-            "subscription_vending.handlers.worker.run_provisioning_workflow",
+            "subscription_vending.workflow.engine.WorkflowEngine.run",
             new=AsyncMock(return_value=result),
         ), patch(
-            "subscription_vending.handlers.worker._settings",
+            "subscription_vending.handlers.worker.controller._settings",
             _make_settings(worker_secret=""),
         ):
             resp = client.post(
@@ -237,10 +238,10 @@ class TestWorkerHandler:
         result = _make_result(errors=["step failed"])
 
         with patch(
-            "subscription_vending.handlers.worker.run_provisioning_workflow",
+            "subscription_vending.workflow.engine.WorkflowEngine.run",
             new=AsyncMock(return_value=result),
         ), patch(
-            "subscription_vending.handlers.worker._settings",
+            "subscription_vending.handlers.worker.controller._settings",
             _make_settings(worker_secret=""),
         ):
             resp = client.post(
@@ -262,9 +263,9 @@ class TestWorkerHandler:
         job = ProvisioningJob(subscription_id="sub-worker-3")
 
         with patch(
-            "subscription_vending.handlers.worker.move_to_dlq",
+            "subscription_vending.handlers.worker.controller.move_to_dlq",
         ) as mock_dlq, patch(
-            "subscription_vending.handlers.worker._settings",
+            "subscription_vending.handlers.worker.controller._settings",
             _make_settings(
                 worker_secret="",
                 storage_account_name="mysa",
@@ -300,10 +301,10 @@ class TestReplayHandler:
         result.plan = ["[STEP_MG] would move to ITL-Dev"]
 
         with patch(
-            "subscription_vending.handlers.replay.run_provisioning_workflow",
+            "subscription_vending.workflow.engine.WorkflowEngine.run",
             new=AsyncMock(return_value=result),
         ), patch(
-            "subscription_vending.handlers.replay._settings",
+            "subscription_vending.handlers.replay.controller._settings",
             _make_settings(worker_secret=""),
         ):
             resp = client.post(
@@ -328,10 +329,10 @@ class TestReplayHandler:
         result = _make_result(errors=["rbac failed"])
 
         with patch(
-            "subscription_vending.handlers.replay.run_provisioning_workflow",
+            "subscription_vending.workflow.engine.WorkflowEngine.run",
             new=AsyncMock(return_value=result),
         ), patch(
-            "subscription_vending.handlers.replay._settings",
+            "subscription_vending.handlers.replay.controller._settings",
             _make_settings(worker_secret=""),
         ):
             resp = client.post(
@@ -353,7 +354,7 @@ class TestReplayHandler:
         client = TestClient(app)
 
         with patch(
-            "subscription_vending.handlers.replay._settings",
+            "subscription_vending.handlers.replay.controller._settings",
             _make_settings(worker_secret="correct-secret"),
         ):
             resp = client.post(

@@ -11,12 +11,12 @@ import pytest
 
 os.environ.setdefault("VENDING_AZURE_TENANT_ID", "test-tenant-id")
 
-from subscription_vending.azure.tags import (  # noqa: E402
+from subscription_vending.infrastructure.azure.tags import (  # noqa: E402
     SubscriptionConfig,
     _resolve_management_group,
     read_subscription_config,
 )
-from subscription_vending.config import Settings  # noqa: E402
+from subscription_vending.core.config import Settings  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ def test_default_mg_property_fallback_when_sandbox_missing():
 async def test_read_config_all_defaults_when_no_tags():
     settings = _make_settings()
     sub = _fake_subscription(tags=None)
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-000", settings)
 
@@ -182,7 +182,7 @@ async def test_read_config_all_defaults_when_no_tags():
 async def test_read_config_itl_environment_tag(env_tag, expected_env, expected_mg):
     settings = _make_settings()
     sub = _fake_subscription(tags={"itl-environment": env_tag})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-001", settings)
 
@@ -195,7 +195,7 @@ async def test_read_config_unknown_environment_uses_default_mg():
     """Unknown environment is accepted; MG resolves to the default (sandbox) MG."""
     settings = _make_settings()
     sub = _fake_subscription(tags={"itl-environment": "not-a-real-env"})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-002", settings)
 
@@ -212,7 +212,7 @@ async def test_read_config_custom_environment_from_mapping():
     })
     settings = _make_settings(environment_mg_mapping=custom_mapping)
     sub = _fake_subscription(tags={"itl-environment": "acceptance"})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-acc", settings)
 
@@ -231,7 +231,7 @@ async def test_read_config_custom_environment_from_mapping():
 async def test_read_config_itl_aks_tag(tag_value, expected):
     settings = _make_settings()
     sub = _fake_subscription(tags={"itl-aks": tag_value})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-003", settings)
 
@@ -242,7 +242,7 @@ async def test_read_config_itl_aks_tag(tag_value, expected):
 async def test_read_config_itl_budget_tag_valid():
     settings = _make_settings()
     sub = _fake_subscription(tags={"itl-budget": "500"})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-004", settings)
 
@@ -253,9 +253,9 @@ async def test_read_config_itl_budget_tag_valid():
 async def test_read_config_itl_budget_tag_invalid_logs_warning(caplog):
     settings = _make_settings()
     sub = _fake_subscription(tags={"itl-budget": "not-a-number"})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
-        with caplog.at_level(logging.WARNING, logger="subscription_vending.azure.tags"):
+        with caplog.at_level(logging.WARNING, logger="subscription_vending.infrastructure.azure.tags"):
             config = await read_subscription_config(MagicMock(), "sub-005", settings)
 
     assert config.budget_eur == 0
@@ -266,7 +266,7 @@ async def test_read_config_itl_budget_tag_invalid_logs_warning(caplog):
 async def test_read_config_itl_owner_tag():
     settings = _make_settings()
     sub = _fake_subscription(tags={"itl-owner": "owner@example.com"})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-006", settings)
 
@@ -282,7 +282,7 @@ async def test_read_config_all_tags_combined():
         "itl-budget": "1000",
         "itl-owner": "team@itlusions.com",
     })
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-007", settings)
 
@@ -298,9 +298,9 @@ async def test_read_config_all_tags_combined():
 async def test_read_config_tags_retrieval_failure_returns_defaults(caplog):
     """SDK error must not crash — defaults are returned instead."""
     settings = _make_settings()
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.side_effect = RuntimeError("Azure unavailable")
-        with caplog.at_level(logging.WARNING, logger="subscription_vending.azure.tags"):
+        with caplog.at_level(logging.WARNING, logger="subscription_vending.infrastructure.azure.tags"):
             config = await read_subscription_config(MagicMock(), "sub-008", settings)
 
     assert config.environment == "sandbox"
@@ -316,7 +316,7 @@ async def test_read_config_custom_mg_names_from_settings():
     custom_mapping = json.dumps({"production": "MyOrg-Prod", "sandbox": "MyOrg-Sandbox"})
     settings = _make_settings(environment_mg_mapping=custom_mapping)
     sub = _fake_subscription(tags={"itl-environment": "production"})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-009", settings)
 
@@ -327,7 +327,7 @@ async def test_read_config_custom_mg_names_from_settings():
 async def test_read_config_empty_tags_dict():
     settings = _make_settings()
     sub = _fake_subscription(tags={})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-010", settings)
 
@@ -343,7 +343,7 @@ async def test_read_config_custom_tag_environment_name():
     """Custom tag_environment name is read instead of the default 'itl-environment'."""
     settings = _make_settings(tag_environment="myorg-env")
     sub = _fake_subscription(tags={"myorg-env": "production"})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-c01", settings)
 
@@ -356,7 +356,7 @@ async def test_read_config_custom_tag_aks_name():
     """Custom tag_aks name is read instead of the default 'itl-aks'."""
     settings = _make_settings(tag_aks="myorg-aks")
     sub = _fake_subscription(tags={"myorg-aks": "true"})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-c02", settings)
 
@@ -368,7 +368,7 @@ async def test_read_config_custom_tag_budget_name():
     """Custom tag_budget name is read instead of the default 'itl-budget'."""
     settings = _make_settings(tag_budget="cost-budget")
     sub = _fake_subscription(tags={"cost-budget": "750"})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-c03", settings)
 
@@ -380,7 +380,7 @@ async def test_read_config_custom_tag_owner_name():
     """Custom tag_owner name is read instead of the default 'itl-owner'."""
     settings = _make_settings(tag_owner="cost-owner")
     sub = _fake_subscription(tags={"cost-owner": "billing@myorg.com"})
-    with patch("subscription_vending.azure.tags.SubscriptionClient") as MockClient:
+    with patch("subscription_vending.infrastructure.azure.tags.SubscriptionClient") as MockClient:
         MockClient.return_value.subscriptions.get.return_value = sub
         config = await read_subscription_config(MagicMock(), "sub-c04", settings)
 

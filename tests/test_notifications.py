@@ -9,7 +9,7 @@ import pytest
 
 os.environ.setdefault("VENDING_AZURE_TENANT_ID", "test-tenant-id")
 
-from subscription_vending.config import Settings  # noqa: E402
+from subscription_vending.core.config import Settings  # noqa: E402
 from subscription_vending.workflow import ProvisioningResult  # noqa: E402
 
 
@@ -46,12 +46,12 @@ def _make_result(**kwargs) -> ProvisioningResult:
 @pytest.mark.asyncio
 async def test_publish_skipped_when_endpoint_not_configured():
     """No SDK client is created when event_grid_topic_endpoint is empty."""
-    from subscription_vending.azure.notifications import publish_provisioned_event  # noqa: PLC0415
+    from subscription_vending.infrastructure.azure.notifications import publish_provisioned_event  # noqa: PLC0415
 
     settings = _make_settings(event_grid_topic_endpoint="")
     result = _make_result()
 
-    with patch("subscription_vending.azure.notifications._get_publisher_client") as mock_client_factory:
+    with patch("subscription_vending.infrastructure.azure.notifications._get_publisher_client") as mock_client_factory:
         await publish_provisioned_event(result=result, subscription_name="Test Sub", settings=settings)
 
     mock_client_factory.assert_not_called()
@@ -63,7 +63,7 @@ async def test_publish_skipped_when_endpoint_not_configured():
 
 @pytest.mark.asyncio
 async def test_publish_sends_event_with_correct_type_and_subject():
-    from subscription_vending.azure.notifications import publish_provisioned_event, _EVENT_TYPE  # noqa: PLC0415
+    from subscription_vending.infrastructure.azure.notifications import publish_provisioned_event, _EVENT_TYPE  # noqa: PLC0415
 
     settings = _make_settings(event_grid_topic_endpoint="https://topic.example.eventgrid.azure.net/api/events")
     result = _make_result()
@@ -74,7 +74,7 @@ async def test_publish_sends_event_with_correct_type_and_subject():
     mock_client.send = lambda events: sent_events.extend(events)
 
     with (
-        patch("subscription_vending.azure.notifications._get_publisher_client", return_value=mock_client),
+        patch("subscription_vending.infrastructure.azure.notifications._get_publisher_client", return_value=mock_client),
     ):
         await publish_provisioned_event(result=result, subscription_name="Test Sub", settings=settings)
 
@@ -90,7 +90,7 @@ async def test_publish_sends_event_with_correct_type_and_subject():
 
 @pytest.mark.asyncio
 async def test_publish_includes_errors_in_payload():
-    from subscription_vending.azure.notifications import publish_provisioned_event  # noqa: PLC0415
+    from subscription_vending.infrastructure.azure.notifications import publish_provisioned_event  # noqa: PLC0415
 
     settings = _make_settings(event_grid_topic_endpoint="https://topic.example.eventgrid.azure.net/api/events")
     result = _make_result(errors=["MG assignment failed: boom"], rbac_roles=[])
@@ -101,7 +101,7 @@ async def test_publish_includes_errors_in_payload():
     mock_client.send = lambda events: sent_events.extend(events)
 
     with (
-        patch("subscription_vending.azure.notifications._get_publisher_client", return_value=mock_client),
+        patch("subscription_vending.infrastructure.azure.notifications._get_publisher_client", return_value=mock_client),
     ):
         await publish_provisioned_event(result=result, subscription_name="Test Sub", settings=settings)
 
@@ -116,7 +116,7 @@ async def test_publish_includes_errors_in_payload():
 @pytest.mark.asyncio
 async def test_publish_error_is_logged_not_raised(caplog):
     import logging  # noqa: PLC0415
-    from subscription_vending.azure.notifications import publish_provisioned_event  # noqa: PLC0415
+    from subscription_vending.infrastructure.azure.notifications import publish_provisioned_event  # noqa: PLC0415
 
     settings = _make_settings(event_grid_topic_endpoint="https://topic.example.eventgrid.azure.net/api/events")
     result = _make_result()
@@ -125,7 +125,7 @@ async def test_publish_error_is_logged_not_raised(caplog):
     mock_client.send.side_effect = RuntimeError("connection refused")
 
     with (
-        patch("subscription_vending.azure.notifications._get_publisher_client", return_value=mock_client),
+        patch("subscription_vending.infrastructure.azure.notifications._get_publisher_client", return_value=mock_client),
         caplog.at_level(logging.WARNING),
     ):
         # Must not raise
@@ -162,13 +162,13 @@ async def test_workflow_calls_publish_notification():
         notification_calls.append((result.subscription_id, subscription_name))
 
     with (
-        patch("subscription_vending.workflow.read_subscription_config", AsyncMock(return_value=config)),
-        patch("subscription_vending.workflow.move_subscription_to_management_group", AsyncMock()),
-        patch("subscription_vending.workflow.attach_foundation_initiative", AsyncMock(return_value="")),
-        patch("subscription_vending.workflow.create_initial_rbac", AsyncMock(return_value=[])),
-        patch("subscription_vending.workflow.assign_default_policies", AsyncMock()),
-        patch("subscription_vending.workflow.publish_provisioned_event", _fake_notify),
-        patch("subscription_vending.azure.management_groups._get_credential", return_value=MagicMock()),
+        patch("subscription_vending.workflow.engine.read_subscription_config", AsyncMock(return_value=config)),
+        patch("subscription_vending.workflow.steps.move_subscription_to_management_group", AsyncMock()),
+        patch("subscription_vending.workflow.steps.attach_foundation_initiative", AsyncMock(return_value="")),
+        patch("subscription_vending.workflow.steps.create_initial_rbac", AsyncMock(return_value=[])),
+        patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
+        patch("subscription_vending.workflow.steps.publish_provisioned_event", _fake_notify),
+        patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
         await run_provisioning_workflow(
             subscription_id="sub-1",
