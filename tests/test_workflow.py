@@ -1,4 +1,4 @@
-"""Unit tests for run_provisioning_workflow and ProvisioningResult."""
+"""Unit tests for WorkflowEngine and ProvisioningResult."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 
 os.environ.setdefault("VENDING_AZURE_TENANT_ID", "test-tenant-id")
 
-from subscription_vending.workflow import ProvisioningResult, run_provisioning_workflow  # noqa: E402
+from subscription_vending.workflow import ProvisioningResult, WorkflowEngine  # noqa: E402
 from subscription_vending.core.config import Settings  # noqa: E402
 
 
@@ -143,7 +143,7 @@ async def test_attach_foundation_initiative_raises_on_http_error():
 
 
 # ---------------------------------------------------------------------------
-# run_provisioning_workflow
+# WorkflowEngine
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -159,11 +159,10 @@ async def test_workflow_returns_provisioning_result():
         patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
         patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
-        result = await run_provisioning_workflow(
+        result = await WorkflowEngine(settings).run(
             subscription_id="sub-1",
             subscription_name="Test Sub",
             management_group_id="ITL",
-            settings=settings,
         )
 
     assert isinstance(result, ProvisioningResult)
@@ -190,11 +189,10 @@ async def test_workflow_mg_step_error_collected_without_stopping():
         patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
         patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
-        result = await run_provisioning_workflow(
+        result = await WorkflowEngine(settings).run(
             subscription_id="sub-1",
             subscription_name="Test Sub",
             management_group_id="ITL",
-            settings=settings,
         )
 
     assert result.success is False
@@ -219,11 +217,10 @@ async def test_workflow_foundation_initiative_error_collected_without_stopping()
         patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
         patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
-        result = await run_provisioning_workflow(
+        result = await WorkflowEngine(settings).run(
             subscription_id="sub-1",
             subscription_name="Test Sub",
             management_group_id="ITL",
-            settings=settings,
         )
 
     assert result.success is False
@@ -248,11 +245,10 @@ async def test_workflow_rbac_error_collected_without_stopping():
         patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
         patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
-        result = await run_provisioning_workflow(
+        result = await WorkflowEngine(settings).run(
             subscription_id="sub-1",
             subscription_name="Test Sub",
             management_group_id="ITL",
-            settings=settings,
         )
 
     assert result.success is False
@@ -277,11 +273,10 @@ async def test_workflow_management_group_set_from_settings_root():
         patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
         patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
-        result = await run_provisioning_workflow(
+        result = await WorkflowEngine(settings).run(
             subscription_id="sub-1",
             subscription_name="Test Sub",
             management_group_id="",
-            settings=settings,
         )
 
     assert result.management_group == "ITL-Root"

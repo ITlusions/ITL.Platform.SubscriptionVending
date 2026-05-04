@@ -143,24 +143,3 @@ class WorkflowEngine:
 
         await _emit_terminal_events(result, ctx)
         return result
-
-
-async def run_provisioning_workflow(
-    subscription_id: str,
-    subscription_name: str,
-    management_group_id: str,
-    settings: Settings,
-    *,
-    dry_run: bool = False,
-) -> ProvisioningResult:
-    """Thin wrapper around :meth:`WorkflowEngine.run` kept for backward compatibility.
-
-    Prefer constructing a :class:`WorkflowEngine` directly when ``settings`` are
-    stable across multiple calls.
-    """
-    return await WorkflowEngine(settings).run(
-        subscription_id=subscription_id,
-        subscription_name=subscription_name,
-        management_group_id=management_group_id,
-        dry_run=dry_run,
-    )

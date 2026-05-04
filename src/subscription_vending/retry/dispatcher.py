@@ -32,7 +32,7 @@ from ..config import Settings
 from ..core.enums import RetryStrategy
 from ..domain.job import ProvisioningJob
 from ..retry.azure_queue import enqueue_job, ensure_queues_exist
-from ..workflow import ProvisioningResult, run_provisioning_workflow
+from ..workflow import ProvisioningResult, WorkflowEngine
 
 logger = logging.getLogger(__name__)
 
@@ -64,11 +64,10 @@ async def dispatch(
     # Strategy: none                                                       #
     # ------------------------------------------------------------------ #
     if strategy == RetryStrategy.NONE:
-        result = await run_provisioning_workflow(
+        result = await WorkflowEngine(settings).run(
             subscription_id=subscription_id,
             subscription_name=subscription_name,
             management_group_id=management_group_id,
-            settings=settings,
         )
         return result, False
 
@@ -81,11 +80,10 @@ async def dispatch(
                 "retry_strategy=queue but VENDING_STORAGE_ACCOUNT_NAME is not set — "
                 "falling back to inline execution"
             )
-            result = await run_provisioning_workflow(
+            result = await WorkflowEngine(settings).run(
                 subscription_id=subscription_id,
                 subscription_name=subscription_name,
                 management_group_id=management_group_id,
-                settings=settings,
             )
             return result, False
 
@@ -119,11 +117,10 @@ async def dispatch(
     # Strategy: dead_letter                                                #
     # ------------------------------------------------------------------ #
     if strategy == RetryStrategy.DEAD_LETTER:
-        result = await run_provisioning_workflow(
+        result = await WorkflowEngine(settings).run(
             subscription_id=subscription_id,
             subscription_name=subscription_name,
             management_group_id=management_group_id,
-            settings=settings,
         )
         # Signal to the caller to return non-200 so Event Grid retries
         should_return_error = not result.success
@@ -136,10 +133,9 @@ async def dispatch(
 
     # Unknown strategy — warn and fall back to inline
     logger.warning("Unknown retry_strategy=%r — falling back to inline (none)", strategy)
-    result = await run_provisioning_workflow(
+    result = await WorkflowEngine(settings).run(
         subscription_id=subscription_id,
         subscription_name=subscription_name,
         management_group_id=management_group_id,
-        settings=settings,
     )
     return result, False

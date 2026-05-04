@@ -17,7 +17,7 @@ from .steps import (  # noqa: F401
     STEP_POLICY,
     STEP_RBAC,
 )
-from .engine import run_provisioning_workflow, WorkflowEngine  # noqa: F401
+from .engine import WorkflowEngine  # noqa: F401
 
 # ── Backward-compat re-exports ─────────────────────────────────────────────────
 # External code (extensions, tests) that imports from subscription_vending.workflow
@@ -35,7 +35,6 @@ from ..core.registry import (  # noqa: F401
 )
 
 __all__ = [
-    "run_provisioning_workflow",
     "WorkflowEngine",
     "STEP_MG",
     "STEP_INITIATIVE",

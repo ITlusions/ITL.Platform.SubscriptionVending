@@ -119,7 +119,7 @@ handlers/          (FastAPI routers — driving adapters)
        ↓
 retry/dispatcher   (strategy: none / queue / dead_letter)
        ↓
-workflow.py::run_provisioning_workflow()
+WorkflowEngine(settings).run()
   ├── Gate steps   (pre-flight checks, executed first, abort on failure)
   └── Workflow steps (provisioning, topologically ordered by depends_on)
             ↓
@@ -144,7 +144,7 @@ extensions/         (auto-discovered plugins: webhook, API notify, ServiceNow)
 | `handlers/` | FastAPI routers (webhook, worker, preflight, replay, mock). |
 | `retry/` | Retry strategy: inline, Azure Storage Queue, or dead-letter. |
 | `config.py` | All settings via `Pydantic BaseSettings` + `get_settings()` singleton. |
-| `workflow.py` | Orchestrator: built-in steps 1–6 + `run_provisioning_workflow()`. Re-exports domain / registry symbols for backward compatibility. |
+| `workflow/engine.py` | Orchestrator: `WorkflowEngine` class — `run()` executes built-in steps 1–6. Re-exports domain / registry symbols for backward compatibility. |
 
 ---
 

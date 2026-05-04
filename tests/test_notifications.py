@@ -140,8 +140,8 @@ async def test_publish_error_is_logged_not_raised(caplog):
 
 @pytest.mark.asyncio
 async def test_workflow_calls_publish_notification():
-    """publish_provisioned_event is invoked as part of run_provisioning_workflow."""
-    from subscription_vending.workflow import run_provisioning_workflow  # noqa: PLC0415
+    """publish_provisioned_event is invoked as part of WorkflowEngine.run()."""
+    from subscription_vending.workflow import WorkflowEngine  # noqa: PLC0415
 
     settings = _make_settings(
         root_management_group="ITL",
@@ -170,11 +170,10 @@ async def test_workflow_calls_publish_notification():
         patch("subscription_vending.workflow.steps.publish_provisioned_event", _fake_notify),
         patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
-        await run_provisioning_workflow(
+        await WorkflowEngine(settings).run(
             subscription_id="sub-1",
             subscription_name="Test Sub",
             management_group_id="ITL",
-            settings=settings,
         )
 
     assert notification_calls == [("sub-1", "Test Sub")]

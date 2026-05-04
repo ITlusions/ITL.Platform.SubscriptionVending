@@ -298,6 +298,183 @@ Triggers the provisioning workflow directly without a real Event Grid event. Onl
 
 ---
 
+## Configuration
+
+### `GET /config`
+
+Returns the active service configuration with all secret fields redacted. Useful for verifying which settings are active without exposing credentials.
+
+The fields `azure_client_secret`, `worker_secret`, and `event_grid_sas_key` are replaced with `"***"` when non-empty.
+
+**Response** `200 OK`
+
+```json
+{
+  "azure_tenant_id": "00000000-0000-0000-0000-000000000001",
+  "azure_client_id": "my-client-id",
+  "azure_client_secret": "***",
+  "retry_strategy": "queue",
+  "provisioning_queue_name": "vending-jobs",
+  "provisioning_dlq_name": "vending-jobs-dlq",
+  "worker_secret": "***",
+  "event_grid_sas_key": "***",
+  "mock_mode": false
+}
+```
+
+---
+
+## Jobs API
+
+The `/jobs/*` endpoints provide visibility into the Azure Storage Queue used by the `queue` retry strategy. They are always registered but are most useful when `VENDING_RETRY_STRATEGY=queue`.
+
+All `/jobs/*` endpoints connect to Azure Storage using the same credentials as the main service (`VENDING_STORAGE_CONNECTION_STRING` or `DefaultAzureCredential` + `VENDING_STORAGE_ACCOUNT_NAME`).
+
+---
+
+### `GET /jobs/stats`
+
+Returns approximate message counts for both the provisioning queue and the dead-letter queue.
+
+**Response** `200 OK`
+
+```json
+{
+  "provisioning": {
+    "queue": "vending-jobs",
+    "approximate_message_count": 3
+  },
+  "dead_letter": {
+    "queue": "vending-jobs-dlq",
+    "approximate_message_count": 1
+  }
+}
+```
+
+If a queue cannot be reached, the response includes `"error": "<message>"` in place of `approximate_message_count`.
+
+---
+
+### `GET /jobs/list`
+
+Peeks the top N messages in the provisioning queue without removing them.
+
+#### Query parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `count` | `5` | Number of messages to peek (1–32) |
+
+**Response** `200 OK`
+
+```json
+{
+  "queue": "vending-jobs",
+  "count": 1,
+  "messages": [
+    {
+      "job_id": "abc123",
+      "subscription_id": "00000000-0000-0000-0000-000000000001",
+      "subscription_name": "my-subscription",
+      "management_group_id": "ITL-Development",
+      "attempt": 1
+    }
+  ]
+}
+```
+
+---
+
+### `GET /jobs/dlq`
+
+Peeks the top N messages in the dead-letter queue. Response shape is identical to `/jobs/list`.
+
+#### Query parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `count` | `5` | Number of messages to peek |
+
+---
+
+### `DELETE /jobs/dlq`
+
+Clears **all** messages from the dead-letter queue. This is a destructive, irreversible operation.
+
+**Response** `200 OK`
+
+```json
+{"queue": "vending-jobs-dlq", "deleted": 3}
+```
+
+---
+
+### `POST /jobs/enqueue`
+
+Enqueues a provisioning job directly to the provisioning queue, bypassing the Event Grid webhook. Useful for manual re-queuing or testing without a real Event Grid event.
+
+**Response** `202 Accepted`
+
+#### Request body
+
+```json
+{
+  "subscription_id": "00000000-0000-0000-0000-000000000001",
+  "subscription_name": "my-subscription",
+  "management_group_id": "ITL-Development",
+  "job_id": "",
+  "attempt": 1
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `subscription_id` | `string` | Yes | — | Azure subscription ID |
+| `subscription_name` | `string` | Yes | — | Display name |
+| `management_group_id` | `string` | No | `""` | Target management group |
+| `job_id` | `string` | No | auto | Custom job ID; a UUID is generated when empty |
+| `attempt` | `integer` | No | `1` | Attempt counter (informational) |
+
+**Response** `202 Accepted`
+
+```json
+{
+  "job_id": "abc123",
+  "message_id": "d3b07384-d113-4ec6-b7b7-d85b72a2f51b",
+  "queue": "vending-jobs"
+}
+```
+
+---
+
+### `GET /jobs/{job_id}`
+
+Looks up a specific job by ID, peeking across both the provisioning queue and the dead-letter queue (up to 32 messages each).
+
+**Response** `200 OK` — found
+
+```json
+{
+  "found": true,
+  "queue": "vending-jobs",
+  "job": {
+    "job_id": "abc123",
+    "subscription_id": "00000000-0000-0000-0000-000000000001",
+    "subscription_name": "my-subscription",
+    "management_group_id": "ITL-Development",
+    "attempt": 1
+  }
+}
+```
+
+**Response** `200 OK` — not found
+
+```json
+{"found": false, "queue": null, "job": null}
+```
+
+---
+
 ## OpenAPI / Swagger UI
 
 When the service is running locally, open the following URLs in your browser:

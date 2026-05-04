@@ -98,8 +98,13 @@ src/subscription_vending/
 │   └── exceptions.py        typed exception hierarchy (AppError → ProvisioningError, etc.)
 │
 ├── workflow/
-│   ├── engine.py            WorkflowEngine class; run_provisioning_workflow() backward-compat wrapper
+│   ├── engine.py            WorkflowEngine class
 │   └── steps.py             built-in provisioning steps 1–6
+│
+├── cli/                     Click CLI (`vending` command)
+│   ├── __init__.py
+│   ├── main.py              provision / preflight / status / enqueue / config subcommands
+│   └── monitor.py           jobs / events subcommands
 │
 ├── schemas/
 │   └── event_grid.py        HTTP schemas: EventGridEvent, WebhookResponse, HealthResponse
@@ -109,7 +114,8 @@ src/subscription_vending/
 │   ├── worker/              POST /worker/process-job
 │   ├── preflight/           POST /webhook/preflight
 │   ├── replay/              POST /webhook/replay
-│   └── mock/                POST /webhook/test (VENDING_MOCK_MODE)
+│   ├── mock/                POST /webhook/test (VENDING_MOCK_MODE)
+│   └── jobs/                GET+DELETE /jobs/* — queue monitoring & management
 │
 ├── infrastructure/          I/O adapters
 │   ├── azure/               Azure SDK calls (management groups, RBAC, policy, tags, notifications)
@@ -226,6 +232,79 @@ def test_something(monkeypatch):
 | `tests/test_tags.py` | Subscription tag parsing and `SubscriptionConfig` derivation |
 | `tests/test_notifications.py` | Outbound notification step |
 | `tests/test_workflow.py` | End-to-end provisioning workflow with mocked Azure calls |
+| `tests/test_jobs.py` | Jobs handler — queue peek, stats, enqueue, purge, and job lookup |
+
+---
+
+## 9. CLI reference
+
+The `vending` CLI provides local and remote-mode access to the service. Install the CLI extras:
+
+```bash
+pip install -e ".[cli]"
+```
+
+All commands that call a live API accept `--remote <URL>` (or `VENDING_API_URL` env var) and `-v / --verbose` to print request timing to stderr.
+
+### Provisioning
+
+```bash
+# Provision a subscription locally (runs WorkflowEngine in-process)
+vending provision --sub-id <id> --sub-name <name> [--mg-id <mg>] [--dry-run]
+
+# Provision via a running API
+vending provision --sub-id <id> --sub-name <name> --remote http://vending:8000 [--secret <secret>]
+
+# Dry-run preflight check
+vending preflight --sub-id <id> --sub-name <name> [--remote http://vending:8000]
+
+# Show current worker / queue status
+vending status
+```
+
+### Configuration
+
+```bash
+# Show active configuration (local: reads Settings; remote: GET /config)
+vending config show [--remote http://vending:8000] [-o json|table]
+
+# Validate configuration and connectivity
+vending config validate [--remote http://vending:8000]
+```
+
+### Queue management
+
+```bash
+# Enqueue a job directly (bypasses Event Grid)
+vending enqueue --sub-id <id> --sub-name <name> [--mg-id <mg>] [--remote http://vending:8000]
+
+# Peek provisioning queue
+vending jobs list [--remote http://vending:8000] [--count 10]
+
+# Peek dead-letter queue
+vending jobs dlq  [--remote http://vending:8000] [--count 10]
+
+# Approximate message counts for both queues
+vending jobs stats [--remote http://vending:8000]
+
+# Continuously poll the provisioning queue
+vending jobs watch [--remote http://vending:8000] [--interval 5]
+
+# Find a specific job by ID (searches both queues)
+vending jobs get <job_id> [--remote http://vending:8000]
+
+# Clear all messages from the dead-letter queue (asks for confirmation)
+vending jobs purge [--remote http://vending:8000] [--yes]
+```
+
+### Event Grid connectivity
+
+```bash
+# Check Event Grid topic endpoint reachability
+vending events test [--remote http://vending:8000]
+```
+
+Local queue commands (`--account` / `--conn-str`) connect directly to Azure Storage Queue. Set `VENDING_STORAGE_ACCOUNT_NAME` or `VENDING_STORAGE_CONNECTION_STRING` to avoid passing them on every invocation.
 
 ---
 

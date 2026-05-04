@@ -74,7 +74,7 @@ extensions/                auto-discovered plugins
 | `extensions/` | Auto-discovered plugins. Each module self-registers at import. Only modules starting with `__` are excluded from discovery. |
 | `handlers/` | FastAPI routers, each as a sub-package (`event_grid/`, `worker/`, `preflight/`, `replay/`, `mock/`). |
 | `core/config.py` | All settings via `Pydantic BaseSettings`. Use `get_settings()` — never instantiate `Settings()` directly. |
-| `workflow/` | Package: `engine.py` hosts `WorkflowEngine` and the backward-compat `run_provisioning_workflow` wrapper; `steps.py` defines built-in steps 1–6. |
+| `workflow/` | Package: `engine.py` hosts `WorkflowEngine`; `steps.py` defines built-in steps 1–6. |
 
 ---
 
@@ -95,7 +95,7 @@ extensions/                auto-discovered plugins
 | `core/protocols.py` | Port contracts: `ManagementGroupPort`, `RbacPort`, `PolicyPort`, `NotificationPort`, `TagReaderPort` — all `@runtime_checkable Protocol` |
 | `core/exceptions.py` | Typed exception hierarchy: `AppError → ProvisioningError` (`GateCheckFailed`, `StepFailed`) `\| AzureIntegrationError` (`ManagementGroupError`, `RbacError`, `PolicyError`, `NotificationError`) `\| ConfigurationError \| AuthorizationError` |
 | `schemas/event_grid.py` | HTTP surface contracts: `EventGridEvent`, `EventGridEventData`, `WebhookResponse`, `HealthResponse` |
-| `workflow/engine.py` | `WorkflowEngine` class — `run()` method orchestrates gates + built-in steps + custom steps + lifecycle events. Also exports backward-compat `run_provisioning_workflow()` wrapper. |
+| `workflow/engine.py` | `WorkflowEngine` class — `run()` method orchestrates gates + built-in steps + custom steps + lifecycle events. |
 | `workflow/steps.py` | Built-in provisioning steps 1–6, each decorated with `@register_step` |
 | `handlers/event_grid/` | `POST /webhook/` — receives Event Grid deliveries, validates SAS key, dispatches to `WorkflowEngine` |
 | `handlers/worker/` | `POST /worker/process-job` — dequeues and processes a `ProvisioningJob` from Azure Storage Queue |

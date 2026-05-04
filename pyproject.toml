@@ -19,6 +19,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio", "httpx"]
+cli = ["click>=8.1", "azure-storage-queue>=12.0"]  # httpx is already a core dependency
+
+[project.scripts]
+vending = "subscription_vending.cli.main:main"
 
 [build-system]
 requires = ["hatchling"]

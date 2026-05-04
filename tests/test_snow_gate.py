@@ -12,9 +12,9 @@ os.environ.setdefault("VENDING_AZURE_TENANT_ID", "test-tenant-id")
 from subscription_vending.workflow import (  # noqa: E402
     ProvisioningResult,
     StepContext,
+    WorkflowEngine,
     _GATE_STEPS,
     register_gate,
-    run_provisioning_workflow,
 )
 from subscription_vending.core.config import Settings  # noqa: E402
 from subscription_vending.infrastructure.azure.tags import SubscriptionConfig  # noqa: E402
@@ -128,7 +128,7 @@ def test_register_gate_stop_on_error_can_be_false():
 
 
 # ---------------------------------------------------------------------------
-# Gate execution in run_provisioning_workflow
+# Gate execution in WorkflowEngine
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -151,11 +151,10 @@ async def test_gate_runs_before_workflow_steps():
         patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
         patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
-        await run_provisioning_workflow(
+        await WorkflowEngine(_make_settings()).run(
             subscription_id="sub-1",
             subscription_name="Test",
             management_group_id="ITL",
-            settings=_make_settings(),
         )
 
     assert call_order[0] == "gate"
@@ -183,11 +182,10 @@ async def test_gate_failure_with_stop_on_error_skips_all_steps():
         patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
         patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
-        result = await run_provisioning_workflow(
+        result = await WorkflowEngine(_make_settings()).run(
             subscription_id="sub-1",
             subscription_name="Test",
             management_group_id="ITL",
-            settings=_make_settings(),
         )
 
     assert result.success is False
@@ -211,11 +209,10 @@ async def test_gate_failure_without_stop_on_error_continues_steps():
         patch("subscription_vending.workflow.steps.assign_default_policies", AsyncMock()),
         patch("subscription_vending.workflow.engine._get_credential", return_value=MagicMock()),
     ):
-        result = await run_provisioning_workflow(
+        result = await WorkflowEngine(_make_settings()).run(
             subscription_id="sub-1",
             subscription_name="Test",
             management_group_id="ITL",
-            settings=_make_settings(),
         )
 
     assert any("Soft gate warning" in e for e in result.errors)
