@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     # Shared secret for /worker/process-job and /webhook/replay (leave empty to disable auth)
     worker_secret:               str = ""
 
+    # API Bearer token auth (Entra ID JWT validation)
+    # Set api_entra_tenant_id to enable.  All endpoints will require a valid Bearer token.
+    api_entra_tenant_id:         str = ""   # Entra ID tenant ID — enables auth when set
+    api_entra_audience:          str = ""   # App URI, e.g. api://<client-id>
+    api_entra_required_role:     str = ""   # App role value callers must hold (optional)
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

@@ -161,7 +161,7 @@ Create a new file in `extensions/` (or a separate package if external):
 ```python
 # extensions/_my_step.py
 from __future__ import annotations
-from ..domain.context import StepContext
+from ..core.context import StepContext
 from ..core.base import BaseStep
 
 class MyStep(BaseStep):
@@ -197,7 +197,7 @@ use that for generic, always-on extensions.
 
 ```python
 from subscription_vending.core.registry import register_step
-from subscription_vending.domain.context import StepContext
+from subscription_vending.core.context import StepContext
 
 @register_step
 async def my_step(ctx: StepContext) -> None:
@@ -214,7 +214,7 @@ async def critical_follow_up(ctx: StepContext) -> None:
 
 ### `StepContext` — available fields
 
-Canonical import: `from subscription_vending.domain.context import StepContext`
+Canonical import: `from subscription_vending.core.context import StepContext`
 
 | Field | Type | Description |
 |---|---|---|
@@ -244,7 +244,7 @@ A gate check runs **before** all provisioning steps. If a gate with
 
 ```python
 from subscription_vending.core.registry import register_gate
-from subscription_vending.domain.context import StepContext
+from subscription_vending.core.context import StepContext
 
 @register_gate
 async def require_owner_tag(ctx: StepContext) -> None:

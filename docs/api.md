@@ -9,6 +9,34 @@ The service exposes a minimal HTTP API. The interactive Swagger UI is available 
 
 ---
 
+## Authentication
+
+By default the API is open — any caller that can reach the network port is accepted.
+
+To require a valid Entra ID Bearer token on **every endpoint**, set the following environment variables on the API server:
+
+```bash
+VENDING_API_ENTRA_TENANT_ID=<your-tenant-id>    # enables auth
+VENDING_API_ENTRA_AUDIENCE=api://<client-id>     # expected aud claim
+VENDING_API_ENTRA_REQUIRED_ROLE=VendingAPI.Write # optional — restrict to a specific app role
+```
+
+When enabled, all requests must carry `Authorization: Bearer <jwt>` with a valid RS256 JWT issued by the configured tenant. Requests without a token or with an invalid token receive `401 Unauthorized`.
+
+### Obtaining a token
+
+```bash
+# Azure CLI
+az account get-access-token --scope api://<client-id>/.default --query accessToken -o tsv
+
+# As a header
+curl -H "Authorization: Bearer <token>" https://vending-api:8000/health
+```
+
+The Web UI handles token forwarding automatically when users log in. See [Web Management UI](web-ui.md).
+
+---
+
 ## Endpoints
 
 ### `GET /health`

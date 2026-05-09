@@ -44,24 +44,42 @@ ITL Subscription Vending  (POST /webhook/)
 The service is designed as a **Microkernel / Plugin pipeline engine**. The core framework is fixed; all provisioning logic is pluggable.
 
 ```
-handlers/                  driving adapters (FastAPI routers)
-     │
-infrastructure/queue/      retry strategy: none / queue / dead_letter
-     │
-workflow/engine.py         WorkflowEngine — built-in steps 1–6 + toposort
-     │
-core/registry.py           step + gate registries
-     │
-core/base.py               BaseStep ABC — plugin contract
-     │
-core/context.py            StepContext, ProvisioningResult — pure dataclasses
-     │
-infrastructure/azure/      Azure SDK adapters
-     │
-core/events.py             lifecycle bus: STARTED / COMPLETED / SUCCEEDED / FAILED
-     │
-extensions/                auto-discovered plugins
+main.py (FastAPI app)
+  │
+  ├─ handlers/                        driving adapters (FastAPI routers)
+  │    │
+  │    ├─ event_grid/  ──► infrastructure/queue/dispatcher.py
+  │    │                         retry_strategy=none  ──► WorkflowEngine (inline)
+  │    │                         retry_strategy=queue ──► Azure Storage Queue
+  │    │                                                        │
+  │    ├─ worker/      ◄──────────────────────────────────────┘
+  │    │     └──────────────────────────────────────────────────► WorkflowEngine
+  │    │
+  │    ├─ replay/, preflight/, mock/  ──► WorkflowEngine (direct)
+  │    └─ jobs/                        ──► infrastructure/queue/azure_queue.py
+  │
+  ├─ workflow/engine.py  (WorkflowEngine)
+  │    ├─ core/registry.py      reads _GATE_STEPS, _EXTRA_STEPS, runs toposort
+  │    ├─ core/context.py       StepContext, ProvisioningResult (pure dataclasses, no I/O)
+  │    ├─ core/events.py        emit() ──► STARTED / COMPLETED / SUCCEEDED / FAILED
+  │    └─ infrastructure/azure/ Azure SDK calls (tags, credential, mgmt groups, rbac,
+  │                              policy, budget, notifications)
+  │
+  └─ lifespan: extensions/autodiscover()
+         │
+         extensions self-register at import time — they WRITE INTO core, not below it:
+           ├─ core/registry.py  via register_step() / register_gate()
+           ├─ core/events.py    via @on(LifecycleEvent.*)
+           └─ core/base.py      (optional) BaseStep ABC — utility for extension authors
 ```
+
+**Key relationships:**
+
+- `infrastructure/queue/` is used only by the `event_grid` handler's retry dispatcher — it is **not** a layer between all handlers and the engine.
+- `core/base.py` is a utility class for extension authors. It is **not** in the engine's call chain; `core/registry.py` does not import it.
+- `core/events.py` is a side-channel pub/sub bus. The engine calls `emit()`; extensions subscribe with `@on()`. It has **no dependency on** `infrastructure/azure/`.
+- `core/context.py` is a pure dataclass module with **no I/O imports** — nothing flows from it to `infrastructure/`.
+- `extensions/` register **upward** into `core/registry.py` and `core/events.py` at startup. They are not downstream consumers in the pipeline.
 
 ### Layer responsibilities
 

@@ -235,3 +235,50 @@ VENDING_TAG_AKS=myorg-aks
 VENDING_TAG_BUDGET=cost-budget
 VENDING_TAG_OWNER=cost-owner
 ```
+
+---
+
+## Web Management UI
+
+These variables configure the browser-based management dashboard started by `vending ui`.  
+They are read from the environment when CLI flags are not supplied.  
+See [Web Management UI](web-ui.md) for the full guide.
+
+| Variable | CLI flag | Default | Description |
+|----------|----------|---------|-------------|
+| `VENDING_API_URL` | `--remote` | *(none)* | Base URL of the running vending API to proxy |
+| `VENDING_UI_HOST` | `--host` | `127.0.0.1` | Host to bind the UI server |
+| `VENDING_UI_PORT` | `--port` | `8080` | Port for the web UI |
+| `VENDING_UI_ENTRA_TENANT_ID` | `--tenant-id` | *(none)* | Entra ID tenant ID. Enables SSO when set together with client ID |
+| `VENDING_UI_ENTRA_CLIENT_ID` | `--client-id` | *(none)* | App registration client ID |
+| `VENDING_UI_ENTRA_CLIENT_SECRET` | `--client-secret` | *(none)* | Client secret. Omit to use PKCE (no secret required) |
+| `VENDING_UI_REDIRECT_URI` | `--redirect-uri` | `http://127.0.0.1:<port>/auth/callback` | OAuth2 redirect URI |
+| `VENDING_UI_ENTRA_REQUIRED_GROUP` | `--required-group` | *(none)* | Entra ID group Object ID — only members are granted access |
+| `VENDING_UI_ENTRA_REQUIRED_ROLE` | `--required-role` | *(none)* | App role value — only users with this role are granted access |
+| `VENDING_UI_ENTRA_API_SCOPE` | `--api-scope` | *(none)* | API scope for delegated access token (only needed when API Bearer auth is enabled and users sign in via SSO) |
+
+### Token auto-detection (login page)
+
+The login page checks these variables for a pre-existing Azure token before falling back to `az account get-access-token`:
+
+| Variable | Typical source |
+|----------|---------------|
+| `ARM_ACCESS_TOKEN` | Azure Pipelines, Terraform |
+| `AZURE_ACCESS_TOKEN` | Manually exported |
+| `VENDING_TOKEN` | `vending --token <t>` or `$env:VENDING_TOKEN` |
+
+---
+
+## API Bearer authentication
+
+When set, every API endpoint requires a valid Entra ID Bearer token (`Authorization: Bearer <jwt>`).  
+Leave all three variables unset (the default) to run without API-level authentication.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VENDING_API_ENTRA_TENANT_ID` | `""` | Entra ID tenant ID. **Enables Bearer auth when set.** All requests must carry a valid RS256 JWT issued by this tenant. |
+| `VENDING_API_ENTRA_AUDIENCE` | `""` | Expected `aud` claim value (e.g. `api://<client-id>`). Must match the audience in the access token. |
+| `VENDING_API_ENTRA_REQUIRED_ROLE` | `""` | App role value that the token's `roles` claim must include. Leave empty to allow any authenticated caller. |
+
+> The API uses `PyJWT[crypto]` for RS256 signature verification via JWKS. Install the `auth` extra: `pip install "itl-subscription-vending[auth]"`.
+

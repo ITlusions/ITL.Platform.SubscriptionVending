@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
+from .api.auth import require_bearer
 from .core.config import get_settings
 from .extensions import autodiscover
 from .handlers.event_grid import router as event_grid_router
@@ -26,6 +27,7 @@ app = FastAPI(
     title="ITL Subscription Vending",
     version="0.1.0",
     lifespan=lifespan,
+    dependencies=[Depends(require_bearer)],
 )
 
 app.include_router(event_grid_router)

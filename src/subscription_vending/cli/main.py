@@ -1,12 +1,12 @@
-"""vending â€” CLI for ITL Subscription Vending.
+"""vending — CLI for ITL Subscription Vending.
 
-Usage â€” local (runs WorkflowEngine in-process)
+Usage — local (runs WorkflowEngine in-process)
 ------
     vending provision  --sub-id <id> --sub-name <name> [--mg-id <mg>] [--dry-run]
     vending preflight  --sub-id <id> --sub-name <name> [--mg-id <mg>]
     vending status
 
-Usage â€” remote (calls a running vending API)
+Usage — remote (calls a running vending API)
 ------
     vending provision  --sub-id <id> --sub-name <name> --remote http://my-host:8000
     vending preflight  --sub-id <id> --sub-name <name> --remote http://my-host:8000
@@ -29,9 +29,17 @@ from ..core.config import Settings
 from .monitor import events, jobs
 
 _REMOTE_ENVVAR = "VENDING_API_URL"
+_TOKEN_ENVVAR  = "VENDING_TOKEN"
 
 
-# â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+def _auth_headers() -> dict[str, str]:
+    """Return Authorization Bearer header when VENDING_TOKEN is set."""
+    import os
+    token = os.environ.get(_TOKEN_ENVVAR)
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+# ── helpers ───────────────────────────────────────────────────────────────────
 
 def _load_settings() -> Settings:
     """Load Settings from env / .env file.  Exits with a clear message on error."""
@@ -123,9 +131,10 @@ def _remote_replay(
 
     if verbose:
         click.echo(click.style(f"> POST {url}", fg="blue"), err=True)
-    click.echo(f"Calling {url} â€¦")
+    click.echo(f"Calling {url} …")
     import time  # noqa: PLC0415
     t0 = time.monotonic()
+    headers = {**headers, **_auth_headers()}
     try:
         resp = httpx.post(url, json=payload, headers=headers, timeout=120)
         elapsed = int((time.monotonic() - t0) * 1000)
@@ -163,11 +172,11 @@ def _remote_preflight(
 
     if verbose:
         click.echo(click.style(f"> POST {url}", fg="blue"), err=True)
-    click.echo(f"Calling {url} â€¦")
+    click.echo(f"Calling {url} …")
     import time  # noqa: PLC0415
     t0 = time.monotonic()
     try:
-        resp = httpx.post(url, json=payload, timeout=60)
+        resp = httpx.post(url, json=payload, headers=_auth_headers(), timeout=60)
         elapsed = int((time.monotonic() - t0) * 1000)
         if verbose:
             color = "green" if resp.status_code < 400 else "red"
@@ -184,19 +193,25 @@ def _remote_preflight(
     sys.exit(0 if success else 1)
 
 
-# â”€â”€ CLI root â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── CLI root ──────────────────────────────────────────────────────────────────
 
 @click.group()
 @click.version_option(package_name="itl-subscription-vending", prog_name="vending")
+@click.option(
+    "--token", default=None, envvar=_TOKEN_ENVVAR,
+    help="Bearer token for the vending API.  Set VENDING_TOKEN to avoid passing on the command line.",
+    is_eager=True, expose_value=False,
+    callback=lambda _ctx, _param, v: __import__("os").environ.update({_TOKEN_ENVVAR: v}) if v else None,
+)
 def cli() -> None:
-    """ITL Subscription Vending â€” manage Azure subscription provisioning.
+    """ITL Subscription Vending — manage Azure subscription provisioning.
 
     By default commands run in-process (local mode).
     Pass --remote <URL> to target a running vending API instead.
     """
 
 
-# â”€â”€ provision â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── provision ─────────────────────────────────────────────────────────────────
 
 @cli.command()
 @click.option("--sub-id",   required=True, envvar="VENDING_SUB_ID",   help="Azure subscription ID.")
@@ -222,9 +237,9 @@ def provision(sub_id: str, sub_name: str, mg_id: str, dry_run: bool, remote: str
     settings = _load_settings()
 
     if dry_run:
-        click.echo(click.style("DRY RUN â€” no Azure changes will be made.", fg="yellow"))
+        click.echo(click.style("DRY RUN — no Azure changes will be made.", fg="yellow"))
 
-    click.echo(f"Provisioning '{sub_name}' ({sub_id}) â€¦")
+    click.echo(f"Provisioning '{sub_name}' ({sub_id}) …")
 
     result = asyncio.run(
         WorkflowEngine(settings).run(
@@ -239,7 +254,7 @@ def provision(sub_id: str, sub_name: str, mg_id: str, dry_run: bool, remote: str
     sys.exit(0 if result.success else 1)
 
 
-# â”€â”€ preflight â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── preflight ─────────────────────────────────────────────────────────────────
 
 @cli.command()
 @click.option("--sub-id",   required=True, envvar="VENDING_SUB_ID",   help="Azure subscription ID.")
@@ -249,7 +264,7 @@ def provision(sub_id: str, sub_name: str, mg_id: str, dry_run: bool, remote: str
 @click.option("-o", "--output", default="table", type=click.Choice(["table", "json"]), help="Output format.")
 @click.option("-v", "--verbose", is_flag=True, envvar="VENDING_VERBOSE", help="Show request details (remote mode).")
 def preflight(sub_id: str, sub_name: str, mg_id: str, remote: str | None, output: str, verbose: bool) -> None:
-    """Dry-run the workflow â€” validate gates and steps without touching Azure.
+    """Dry-run the workflow — validate gates and steps without touching Azure.
 
     Local mode:  runs WorkflowEngine(dry_run=True) in-process.
     Remote mode: POSTs to POST /webhook/preflight on the target API.
@@ -262,7 +277,7 @@ def preflight(sub_id: str, sub_name: str, mg_id: str, remote: str | None, output
 
     settings = _load_settings()
 
-    click.echo(f"Running preflight for '{sub_name}' ({sub_id}) â€¦")
+    click.echo(f"Running preflight for '{sub_name}' ({sub_id}) …")
 
     result = asyncio.run(
         WorkflowEngine(settings).run(
@@ -277,7 +292,7 @@ def preflight(sub_id: str, sub_name: str, mg_id: str, remote: str | None, output
     sys.exit(0 if result.success else 1)
 
 
-# â”€â”€ status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── status ────────────────────────────────────────────────────────────────────
 
 @cli.command()
 @click.option("-o", "--output", default="table", type=click.Choice(["table", "json"]), help="Output format.")
@@ -305,10 +320,10 @@ def status(output: str) -> None:
         click.echo(f"  {key:<35} {val}")
 
 
-# â”€â”€ entry-point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── entry-point ─────────────────────────────────────────────────────
 
 
-# â”€â”€ enqueue â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── enqueue ───────────────────────────────────────────────────────────────
 
 @cli.command()
 @click.option("--sub-id",   required=True, envvar="VENDING_SUB_ID",   help="Azure subscription ID.")
@@ -323,7 +338,7 @@ def enqueue(sub_id: str, sub_name: str, mg_id: str, job_id: str, remote: str | N
     Remote mode: POST /jobs/enqueue on the vending API.
     Local mode:  connects to Azure Storage Queue directly.
 
-    Unlike 'provision', this does not run the workflow immediately â€” the
+    Unlike 'provision', this does not run the workflow immediately — the
     worker picks it up asynchronously (requires retry_strategy=queue).
     """
     payload = {
@@ -340,7 +355,7 @@ def enqueue(sub_id: str, sub_name: str, mg_id: str, job_id: str, remote: str | N
             click.echo(click.style(f"> POST {url}", fg="blue"), err=True)
         t0 = time.monotonic()
         try:
-            resp = httpx.post(url, json=payload, timeout=30)
+            resp = httpx.post(url, json=payload, headers=_auth_headers(), timeout=30)
             elapsed = int((time.monotonic() - t0) * 1000)
             if verbose:
                 color = "green" if resp.status_code < 400 else "red"
@@ -360,7 +375,7 @@ def enqueue(sub_id: str, sub_name: str, mg_id: str, job_id: str, remote: str | N
     try:
         import base64  # noqa: PLC0415
         import uuid    # noqa: PLC0415
-        from ..infrastructure.queue import get_queue_client  # noqa: PLC0415 â€” best-effort
+        from ..infrastructure.queue import get_queue_client  # noqa: PLC0415 — best-effort
     except ImportError:
         click.echo(
             "Local enqueue requires azure-storage-queue.\n"
@@ -378,7 +393,7 @@ def enqueue(sub_id: str, sub_name: str, mg_id: str, job_id: str, remote: str | N
     click.echo(f"Enqueued  job_id={final_job_id}  message_id={result.id}  queue={settings.provisioning_queue_name}")
 
 
-# â”€â”€ config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── config ───────────────────────────────────────────────────────────────
 
 @cli.group()
 def config() -> None:
@@ -403,7 +418,7 @@ def config_show(remote: str | None, output: str, verbose: bool) -> None:
             click.echo(click.style(f"> GET {url}", fg="blue"), err=True)
         t0 = time.monotonic()
         try:
-            resp = httpx.get(url, timeout=15)
+            resp = httpx.get(url, headers=_auth_headers(), timeout=15)
             elapsed = int((time.monotonic() - t0) * 1000)
             if verbose:
                 color = "green" if resp.status_code < 400 else "red"
@@ -463,7 +478,7 @@ def config_validate(remote: str | None, verbose: bool) -> None:
                 click.echo(click.style(f"> GET {url}", fg="blue"), err=True)
             t0 = time.monotonic()
             try:
-                resp = httpx.get(url, timeout=15)
+                resp = httpx.get(url, headers=_auth_headers(), timeout=15)
                 elapsed = int((time.monotonic() - t0) * 1000)
                 if verbose:
                     color = "green" if resp.status_code < 400 else "red"
@@ -518,6 +533,104 @@ def config_validate(remote: str | None, verbose: bool) -> None:
         click.echo(click.style(f"\n{len(errors)} validation error(s).", fg="red"))
         sys.exit(1)
     click.echo(click.style("\nConfiguration valid.", fg="green"))
+# ── ui ───────────────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.option("--host",          default="127.0.0.1", show_default=True, envvar="VENDING_UI_HOST",
+              help="Host to bind the UI server to.")
+@click.option("--port",          default=8080,         show_default=True, envvar="VENDING_UI_PORT",
+              help="Port for the web UI.")
+@click.option("--remote",        default=None, envvar=_REMOTE_ENVVAR,
+              help="Base URL of a running vending API to proxy (e.g. http://vending:8000).")
+@click.option("--tenant-id",     default=None, envvar="VENDING_UI_ENTRA_TENANT_ID",
+              help="Entra ID tenant ID. Enables SSO when combined with --client-id and --client-secret.")
+@click.option("--client-id",     default=None, envvar="VENDING_UI_ENTRA_CLIENT_ID",
+              help="Entra ID app registration client ID.")
+@click.option("--client-secret", default=None, envvar="VENDING_UI_ENTRA_CLIENT_SECRET",
+              help="Entra ID client secret. Omit to use PKCE (no secret) — requires 'Allow public client flows' on the app registration.")
+@click.option("--redirect-uri",  default=None, envvar="VENDING_UI_REDIRECT_URI",
+              help="OAuth2 redirect URI (default: http://127.0.0.1:<port>/auth/callback).")
+@click.option("--required-group",  default=None, envvar="VENDING_UI_ENTRA_REQUIRED_GROUP",
+              help="Entra ID group object ID. Only members of this group are granted access.")
+@click.option("--required-role",   default=None, envvar="VENDING_UI_ENTRA_REQUIRED_ROLE",
+              help="App role value (e.g. VendingUI.Access). Only users with this role are granted access.")
+@click.option("--api-scope",       default=None, envvar="VENDING_UI_ENTRA_API_SCOPE",
+              help="API scope to request an access token for, e.g. api://<api-client-id>/.default. "
+                   "When set, the UI passes the token as Bearer when proxying requests to --remote.")
+@click.option("--open",          "open_browser", is_flag=True, default=False,
+              help="Open the browser automatically after starting.")
+def ui(
+    host: str,
+    port: int,
+    remote: str | None,
+    tenant_id: str | None,
+    client_id: str | None,
+    client_secret: str | None,
+    redirect_uri: str | None,
+    required_group: str | None,
+    required_role: str | None,
+    api_scope: str | None,
+    open_browser: bool,
+) -> None:
+    """Start the web management UI.
+
+    Launches a browser-based dashboard for managing subscription vending.
+    All API calls are proxied to --remote (VENDING_API_URL).
+    When --remote is not set, the config page reads local settings.
+
+    \b
+    Pages:
+      /dashboard   Health, queue stats, recent jobs (auto-refresh)
+      /jobs        Job queue + dead-letter queue viewer, DLQ purge
+      /provision   Provision / preflight form
+      /config      Active configuration (secrets redacted)
+
+    \b
+    SSO (Entra ID):
+      Pass --tenant-id, --client-id, and --client-secret to require sign-in.
+      Register a Web app in Entra ID and add the redirect URI:
+        http://127.0.0.1:<port>/auth/callback
+      Set VENDING_UI_ENTRA_TENANT_ID / _CLIENT_ID / _CLIENT_SECRET in .env
+      to avoid passing secrets on the command line.
+    """
+    try:
+        import uvicorn  # noqa: PLC0415
+    except ImportError:
+        click.echo(
+            "uvicorn is required for the web UI.  "
+            "Run: pip install 'itl-subscription-vending[ui]'",
+            err=True,
+        )
+        sys.exit(2)
+
+    from .ui import app as ui_app, configure  # noqa: PLC0415
+
+    configure(
+        remote_url=remote,
+        tenant_id=tenant_id,
+        client_id=client_id,
+        client_secret=client_secret,
+        redirect_uri=redirect_uri,
+        required_group=required_group,
+        required_role=required_role,
+        api_scope=api_scope,
+        port=port,
+    )
+    target = remote or "(local settings only)"
+    sso_label = "  SSO: enabled" if (tenant_id and client_id) else ""
+    url = f"http://{host}:{port}"
+    click.echo(f"Vending UI  →  {url}   remote: {target}{sso_label}")
+
+    if open_browser:
+        import threading, webbrowser  # noqa: PLC0415, E401
+        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+
+    uvicorn.run(ui_app, host=host, port=port, log_level="warning")
+
+
+# ── entry-point ───────────────────────────────────────────────────────────────
+
+
 def main() -> None:
     cli()
 

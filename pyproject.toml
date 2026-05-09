@@ -18,8 +18,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "httpx"]
-cli = ["click>=8.1", "azure-storage-queue>=12.0"]  # httpx is already a core dependency
+dev  = ["pytest", "pytest-asyncio", "httpx"]
+cli  = ["click>=8.1", "azure-storage-queue>=12.0"]  # httpx is already a core dependency
+ui   = ["click>=8.1", "itsdangerous>=2.0", "msal>=1.0"]  # itsdangerous: SessionMiddleware; msal: Entra ID SSO
+auth = ["PyJWT[crypto]>=2.8"]  # RS256 Bearer token validation for the API
 
 [project.scripts]
 vending = "subscription_vending.cli.main:main"

@@ -211,7 +211,7 @@ The test suite uses `pytest-asyncio` in `auto` mode, so all `async` test functio
 When patching settings in tests, call `get_settings.cache_clear()` before applying `monkeypatch` env vars:
 
 ```python
-from subscription_vending.config import get_settings
+from subscription_vending.core.config import get_settings
 
 def test_something(monkeypatch):
     get_settings.cache_clear()
@@ -303,6 +303,27 @@ vending jobs purge [--remote http://vending:8000] [--yes]
 # Check Event Grid topic endpoint reachability
 vending events test [--remote http://vending:8000]
 ```
+
+### Web management UI
+
+```bash
+# Start the browser-based management dashboard
+vending ui [--remote http://vending:8000] [--port 8080] [--open]
+```
+
+`vending ui` launches a small web server (default `http://127.0.0.1:8080`) with four pages:
+
+| Page | Path | Description |
+|---|---|---|
+| Dashboard | `/dashboard` | API health, queue stats, recent jobs — auto-refreshes |
+| Jobs | `/jobs` | Browse the provisioning queue and DLQ; DLQ purge button |
+| Provision | `/provision` | Provision or preflight a subscription via a web form |
+| Config | `/config` | Active configuration with secrets redacted |
+
+All API calls are proxied to `--remote` (or `VENDING_API_URL`). When no remote is configured,
+the config page reads local settings; other pages show a "configure --remote" prompt.
+
+Install: `pip install 'itl-subscription-vending[ui]'` (FastAPI + uvicorn are core deps — the `[ui]` extra only adds `click`).
 
 Local queue commands (`--account` / `--conn-str`) connect directly to Azure Storage Queue. Set `VENDING_STORAGE_ACCOUNT_NAME` or `VENDING_STORAGE_CONNECTION_STRING` to avoid passing them on every invocation.
 
